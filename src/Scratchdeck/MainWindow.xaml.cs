@@ -18,29 +18,41 @@ public partial class MainWindow : Window
 {
     private readonly WorkspaceState _state;
     private readonly WorkspacePersistenceService _persistence;
+    private readonly ThemeService _themes;
     private CancellationTokenSource? _autosaveCancellation;
     private TabDocument? _activeTab;
     private TabDocument? _draggedTab;
     private WpfPoint _dragStart;
     private string _renameOriginalTitle = string.Empty;
+    private List<ThemeColorField> _appThemeFields = [];
+    private List<ThemeColorField> _codeThemeFields = [];
+    private string? _editingAppThemeId;
+    private string? _editingCodeThemeId;
     private bool _isLoadingEditor;
+    private bool _isLoadingThemes;
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
 
-    public MainWindow(WorkspaceState state, WorkspacePersistenceService persistence)
+    public MainWindow(
+        WorkspaceState state,
+        WorkspacePersistenceService persistence,
+        ThemeService themes)
     {
         _state = state;
         _persistence = persistence;
+        _themes = themes;
         _state.Normalize();
 
         InitializeComponent();
 
         _isLoadingEditor = true;
+        _isLoadingThemes = true;
         DataContext = _state;
         SyntaxCombo.ItemsSource = SyntaxHighlightingService.Modes;
-        ThemeCombo.ItemsSource = ThemeService.Themes;
-        ThemeCombo.SelectedItem = _state.Theme;
+        RefreshThemeControls();
+        ThemeFileStatus.Text = System.IO.Path.GetFileName(_themes.ThemesFilePath);
+        ThemeFileStatus.ToolTip = _themes.ThemesFilePath;
         TabsList.SelectedIndex = _state.SelectedTabIndex;
         Topmost = _state.Topmost;
         PinToggle.IsChecked = _state.Topmost;
@@ -58,6 +70,7 @@ public partial class MainWindow : Window
         _activeTab = _state.Tabs[_state.SelectedTabIndex];
         LoadActiveTab();
         _isLoadingEditor = false;
+        _isLoadingThemes = false;
         UpdateEditorTheme();
         UpdateEditorStatus();
         UpdateWindowStateGlyph();
@@ -151,6 +164,11 @@ public partial class MainWindow : Window
         else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.P)
         {
             PinToggle.IsChecked = !(PinToggle.IsChecked ?? false);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && ThemePanel.Visibility == Visibility.Visible)
+        {
+            CloseThemePanel();
             e.Handled = true;
         }
         else if (e.Key == Key.Escape && SearchPanel.Visibility == Visibility.Visible)
@@ -307,7 +325,7 @@ public partial class MainWindow : Window
             Editor.TextArea.SelectionBrush = selection;
         }
 
-        if (TryFindResource("EditorForegroundBrush") is Brush foreground)
+        if (TryFindResource("EditorCaretBrush") is Brush foreground)
         {
             Editor.TextArea.Caret.CaretBrush = foreground;
         }
@@ -659,19 +677,297 @@ public partial class MainWindow : Window
         ScheduleAutosave();
     }
 
-    private void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void AppThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isLoadingEditor || ThemeCombo.SelectedItem is not string theme)
+        if (_isLoadingThemes || AppThemeCombo.SelectedItem is not AppThemeDefinition theme)
         {
             return;
         }
 
-        _state.Theme = theme;
-        ThemeService.Apply(theme);
-        UpdateEditorTheme();
-        ApplySyntaxHighlighting();
+        _state.AppThemeId = theme.Id;
+        _themes.ApplyAppTheme(theme.Id);
+        if (ThemePanel.Visibility == Visibility.Visible)
+        {
+            LoadAppThemeEditor(theme);
+            AppThemeEditorCombo.SelectedItem = theme;
+        }
         ScheduleAutosave();
     }
+
+    private void CodeThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingThemes || CodeThemeCombo.SelectedItem is not CodeThemeDefinition theme)
+        {
+            return;
+        }
+
+        _state.CodeThemeId = theme.Id;
+        _themes.ApplyCodeTheme(theme.Id);
+        UpdateEditorTheme();
+        ApplySyntaxHighlighting();
+        if (ThemePanel.Visibility == Visibility.Visible)
+        {
+            LoadCodeThemeEditor(theme);
+            CodeThemeEditorCombo.SelectedItem = theme;
+        }
+        ScheduleAutosave();
+    }
+
+    private void RefreshThemeControls(string? appEditorId = null, string? codeEditorId = null)
+    {
+        var wasLoading = _isLoadingThemes;
+        _isLoadingThemes = true;
+
+        AppThemeCombo.ItemsSource = null;
+        CodeThemeCombo.ItemsSource = null;
+        AppThemeEditorCombo.ItemsSource = null;
+        CodeThemeEditorCombo.ItemsSource = null;
+
+        AppThemeCombo.ItemsSource = _themes.AppThemes;
+        CodeThemeCombo.ItemsSource = _themes.CodeThemes;
+        AppThemeEditorCombo.ItemsSource = _themes.AppThemes;
+        CodeThemeEditorCombo.ItemsSource = _themes.CodeThemes;
+
+        var activeApp = _themes.FindAppTheme(_state.AppThemeId) ?? _themes.AppThemes[0];
+        var activeCode = _themes.FindCodeTheme(_state.CodeThemeId) ?? _themes.CodeThemes[0];
+        var editorApp = _themes.FindAppTheme(appEditorId) ?? activeApp;
+        var editorCode = _themes.FindCodeTheme(codeEditorId) ?? activeCode;
+
+        AppThemeCombo.SelectedItem = activeApp;
+        CodeThemeCombo.SelectedItem = activeCode;
+        AppThemeEditorCombo.SelectedItem = editorApp;
+        CodeThemeEditorCombo.SelectedItem = editorCode;
+        LoadAppThemeEditor(editorApp);
+        LoadCodeThemeEditor(editorCode);
+
+        _isLoadingThemes = wasLoading;
+    }
+
+    private void AppThemeEditorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoadingThemes && AppThemeEditorCombo.SelectedItem is AppThemeDefinition theme)
+        {
+            LoadAppThemeEditor(theme);
+            SetThemeEditorStatus("APP THEME LOADED", "MutedTextBrush");
+        }
+    }
+
+    private void CodeThemeEditorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoadingThemes && CodeThemeEditorCombo.SelectedItem is CodeThemeDefinition theme)
+        {
+            LoadCodeThemeEditor(theme);
+            SetThemeEditorStatus("CODE THEME LOADED", "MutedTextBrush");
+        }
+    }
+
+    private void LoadAppThemeEditor(AppThemeDefinition theme)
+    {
+        _editingAppThemeId = theme.Id;
+        AppThemeTitleBox.Text = theme.Title;
+        _appThemeFields = CreateAppThemeFields(theme.Colors);
+        AppThemeFieldsList.ItemsSource = _appThemeFields;
+    }
+
+    private void LoadCodeThemeEditor(CodeThemeDefinition theme)
+    {
+        _editingCodeThemeId = theme.Id;
+        CodeThemeTitleBox.Text = theme.Title;
+        _codeThemeFields = CreateCodeThemeFields(theme.Colors);
+        CodeThemeFieldsList.ItemsSource = _codeThemeFields;
+    }
+
+    private void OpenThemePanelButton_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshThemeControls();
+        ThemePanelScrim.Visibility = Visibility.Visible;
+        ThemePanel.Visibility = Visibility.Visible;
+        SetThemeEditorStatus("READY", "MutedTextBrush");
+    }
+
+    private void CloseThemePanelButton_Click(object sender, RoutedEventArgs e) => CloseThemePanel();
+
+    private void ThemePanelScrim_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => CloseThemePanel();
+
+    private void CloseThemePanel()
+    {
+        ThemePanel.Visibility = Visibility.Collapsed;
+        ThemePanelScrim.Visibility = Visibility.Collapsed;
+        Editor.Focus();
+    }
+
+    private void NewAppThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var source = _themes.FindAppTheme(_state.AppThemeId) ?? _themes.AppThemes[0];
+        _editingAppThemeId = null;
+        _isLoadingThemes = true;
+        AppThemeEditorCombo.SelectedIndex = -1;
+        _isLoadingThemes = false;
+        AppThemeTitleBox.Text = $"{source.Title} Custom";
+        _appThemeFields = CreateAppThemeFields(source.Colors);
+        AppThemeFieldsList.ItemsSource = _appThemeFields;
+        SetThemeEditorStatus("NEW APP THEME", "AccentBrush");
+        AppThemeTitleBox.Focus();
+        AppThemeTitleBox.SelectAll();
+    }
+
+    private void NewCodeThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var source = _themes.FindCodeTheme(_state.CodeThemeId) ?? _themes.CodeThemes[0];
+        _editingCodeThemeId = null;
+        _isLoadingThemes = true;
+        CodeThemeEditorCombo.SelectedIndex = -1;
+        _isLoadingThemes = false;
+        CodeThemeTitleBox.Text = $"{source.Title} Custom";
+        _codeThemeFields = CreateCodeThemeFields(source.Colors);
+        CodeThemeFieldsList.ItemsSource = _codeThemeFields;
+        SetThemeEditorStatus("NEW CODE THEME", "SecondaryAccentBrush");
+        CodeThemeTitleBox.Focus();
+        CodeThemeTitleBox.SelectAll();
+    }
+
+    private async void SaveAppThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadAppThemeColors(out var colors))
+        {
+            SetThemeEditorStatus("INVALID APP COLOR", "DangerBrush");
+            return;
+        }
+
+        try
+        {
+            var saved = await _themes.UpsertAppThemeAsync(new AppThemeDefinition
+            {
+                Id = _editingAppThemeId ?? string.Empty,
+                Title = AppThemeTitleBox.Text.Trim(),
+                Colors = colors
+            });
+            _state.AppThemeId = saved.Id;
+            _themes.ApplyAppTheme(saved.Id);
+            RefreshThemeControls(saved.Id, _editingCodeThemeId);
+            ScheduleAutosave();
+            SetThemeEditorStatus("APP THEME SAVED", "SuccessBrush");
+        }
+        catch (Exception ex)
+        {
+            SetThemeEditorStatus($"SAVE FAILED: {ex.Message}", "DangerBrush");
+        }
+    }
+
+    private async void SaveCodeThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadCodeThemeColors(out var colors))
+        {
+            SetThemeEditorStatus("INVALID CODE COLOR", "DangerBrush");
+            return;
+        }
+
+        try
+        {
+            var saved = await _themes.UpsertCodeThemeAsync(new CodeThemeDefinition
+            {
+                Id = _editingCodeThemeId ?? string.Empty,
+                Title = CodeThemeTitleBox.Text.Trim(),
+                Colors = colors
+            });
+            _state.CodeThemeId = saved.Id;
+            _themes.ApplyCodeTheme(saved.Id);
+            UpdateEditorTheme();
+            ApplySyntaxHighlighting();
+            RefreshThemeControls(_editingAppThemeId, saved.Id);
+            ScheduleAutosave();
+            SetThemeEditorStatus("CODE THEME SAVED", "SuccessBrush");
+        }
+        catch (Exception ex)
+        {
+            SetThemeEditorStatus($"SAVE FAILED: {ex.Message}", "DangerBrush");
+        }
+    }
+
+    private void SetThemeEditorStatus(string text, string brushResource)
+    {
+        ThemeEditorStatus.Text = text;
+        ThemeEditorStatus.SetResourceReference(TextBlock.ForegroundProperty, brushResource);
+    }
+
+    private static List<ThemeColorField> CreateAppThemeFields(AppThemeColors colors) =>
+    [
+        new(nameof(colors.Background), "Background", colors.Background),
+        new(nameof(colors.Surface), "Surface", colors.Surface),
+        new(nameof(colors.RaisedSurface), "Raised surface", colors.RaisedSurface),
+        new(nameof(colors.Border), "Border", colors.Border),
+        new(nameof(colors.OuterEdgeTop), "Outer edge / top", colors.OuterEdgeTop),
+        new(nameof(colors.OuterEdgeBottom), "Outer edge / bottom", colors.OuterEdgeBottom),
+        new(nameof(colors.PrimaryAccent), "Primary accent", colors.PrimaryAccent),
+        new(nameof(colors.SecondaryAccent), "Secondary accent", colors.SecondaryAccent),
+        new(nameof(colors.Text), "Text", colors.Text),
+        new(nameof(colors.MutedText), "Muted text", colors.MutedText),
+        new(nameof(colors.SubtleText), "Subtle text", colors.SubtleText),
+        new(nameof(colors.Danger), "Danger", colors.Danger),
+        new(nameof(colors.Success), "Success", colors.Success)
+    ];
+
+    private static List<ThemeColorField> CreateCodeThemeFields(CodeThemeColors colors) =>
+    [
+        new(nameof(colors.Background), "Background", colors.Background),
+        new(nameof(colors.Foreground), "Foreground", colors.Foreground),
+        new(nameof(colors.Selection), "Selection", colors.Selection),
+        new(nameof(colors.Keyword), "Keyword", colors.Keyword),
+        new(nameof(colors.Type), "Type / tag", colors.Type),
+        new(nameof(colors.String), "String", colors.String),
+        new(nameof(colors.Number), "Number", colors.Number),
+        new(nameof(colors.Comment), "Comment", colors.Comment),
+        new(nameof(colors.LineNumber), "Line number", colors.LineNumber),
+        new(nameof(colors.Caret), "Caret", colors.Caret)
+    ];
+
+    private bool TryReadAppThemeColors(out AppThemeColors colors)
+    {
+        colors = new AppThemeColors();
+        if (string.IsNullOrWhiteSpace(AppThemeTitleBox.Text) || _appThemeFields.Any(field => !field.IsValid))
+        {
+            return false;
+        }
+
+        colors.Background = ThemeValue(_appThemeFields, nameof(colors.Background));
+        colors.Surface = ThemeValue(_appThemeFields, nameof(colors.Surface));
+        colors.RaisedSurface = ThemeValue(_appThemeFields, nameof(colors.RaisedSurface));
+        colors.Border = ThemeValue(_appThemeFields, nameof(colors.Border));
+        colors.OuterEdgeTop = ThemeValue(_appThemeFields, nameof(colors.OuterEdgeTop));
+        colors.OuterEdgeBottom = ThemeValue(_appThemeFields, nameof(colors.OuterEdgeBottom));
+        colors.PrimaryAccent = ThemeValue(_appThemeFields, nameof(colors.PrimaryAccent));
+        colors.SecondaryAccent = ThemeValue(_appThemeFields, nameof(colors.SecondaryAccent));
+        colors.Text = ThemeValue(_appThemeFields, nameof(colors.Text));
+        colors.MutedText = ThemeValue(_appThemeFields, nameof(colors.MutedText));
+        colors.SubtleText = ThemeValue(_appThemeFields, nameof(colors.SubtleText));
+        colors.Danger = ThemeValue(_appThemeFields, nameof(colors.Danger));
+        colors.Success = ThemeValue(_appThemeFields, nameof(colors.Success));
+        return true;
+    }
+
+    private bool TryReadCodeThemeColors(out CodeThemeColors colors)
+    {
+        colors = new CodeThemeColors();
+        if (string.IsNullOrWhiteSpace(CodeThemeTitleBox.Text) || _codeThemeFields.Any(field => !field.IsValid))
+        {
+            return false;
+        }
+
+        colors.Background = ThemeValue(_codeThemeFields, nameof(colors.Background));
+        colors.Foreground = ThemeValue(_codeThemeFields, nameof(colors.Foreground));
+        colors.Selection = ThemeValue(_codeThemeFields, nameof(colors.Selection));
+        colors.Keyword = ThemeValue(_codeThemeFields, nameof(colors.Keyword));
+        colors.Type = ThemeValue(_codeThemeFields, nameof(colors.Type));
+        colors.String = ThemeValue(_codeThemeFields, nameof(colors.String));
+        colors.Number = ThemeValue(_codeThemeFields, nameof(colors.Number));
+        colors.Comment = ThemeValue(_codeThemeFields, nameof(colors.Comment));
+        colors.LineNumber = ThemeValue(_codeThemeFields, nameof(colors.LineNumber));
+        colors.Caret = ThemeValue(_codeThemeFields, nameof(colors.Caret));
+        return true;
+    }
+
+    private static string ThemeValue(IEnumerable<ThemeColorField> fields, string key) =>
+        fields.First(field => field.Key == key).Value.Trim().ToUpperInvariant();
 
     private void PinToggle_Changed(object sender, RoutedEventArgs e)
     {
@@ -695,6 +991,65 @@ public partial class MainWindow : Window
         _state.AutoWrap = WrapToggle.IsChecked ?? false;
         ApplyWordWrap();
         ScheduleAutosave();
+    }
+
+    private void Editor_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var position = Editor.GetPositionFromPoint(e.GetPosition(Editor));
+        if (position is null)
+        {
+            return;
+        }
+
+        var offset = Math.Clamp(Editor.Document.GetOffset(position.Value.Location), 0, Editor.Document.TextLength);
+        var selectionStart = Editor.SelectionStart;
+        var selectionEnd = selectionStart + Editor.SelectionLength;
+        var clickedInsideSelection = Editor.SelectionLength > 0 && offset >= selectionStart && offset < selectionEnd;
+        if (!clickedInsideSelection)
+        {
+            Editor.Select(offset, 0);
+            Editor.CaretOffset = offset;
+        }
+        Editor.Focus();
+    }
+
+    private void EditorContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        CutMenuItem.IsEnabled = Editor.SelectionLength > 0;
+        CopyMenuItem.IsEnabled = Editor.SelectionLength > 0;
+        SelectAllMenuItem.IsEnabled = Editor.Text.Length > 0;
+        try
+        {
+            PasteMenuItem.IsEnabled = System.Windows.Clipboard.ContainsText();
+        }
+        catch
+        {
+            PasteMenuItem.IsEnabled = false;
+        }
+    }
+
+    private void CutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Focus();
+        Editor.Cut();
+    }
+
+    private void CopyMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Focus();
+        Editor.Copy();
+    }
+
+    private void PasteMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Focus();
+        Editor.Paste();
+    }
+
+    private void SelectAllMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Focus();
+        Editor.SelectAll();
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => FindMatch(forward: true, restart: true);

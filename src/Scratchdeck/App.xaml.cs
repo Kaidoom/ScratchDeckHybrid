@@ -20,12 +20,16 @@ public partial class App : System.Windows.Application
         }
 
         var paths = WorkspacePaths.CreateDefault();
+        var themes = new ThemeService(paths);
+        await themes.LoadAsync();
         var persistence = new WorkspacePersistenceService(paths, new DpapiProtectionService());
         var state = await persistence.LoadAsync();
 
-        ThemeService.Apply(state.Theme);
+        themes.NormalizeSelections(state);
+        themes.ApplyAppTheme(state.AppThemeId);
+        themes.ApplyCodeTheme(state.CodeThemeId);
 
-        var window = new MainWindow(state, persistence);
+        var window = new MainWindow(state, persistence, themes);
         MainWindow = window;
         _singleInstance.ActivationRequested += (_, _) => Dispatcher.Invoke(window.RestoreAndActivate);
         _singleInstance.StartListening();

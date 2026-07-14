@@ -30,6 +30,40 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
+    <Window.Resources>
+        <DataTemplate x:Key="ThemeColorFieldTemplate">
+            <Grid Margin="0,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="128" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="10"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Text="{Binding Label}" />
+                <Border x:Name="Swatch"
+                        Grid.Column="1"
+                        Width="20" Height="20"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Background="{Binding PreviewBrush}" />
+                <TextBox x:Name="HexValue"
+                         Grid.Column="2"
+                         Height="25"
+                         Padding="6,2"
+                         FontFamily="{StaticResource MonoFont}"
+                         Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsValid}" Value="False">
+                    <Setter TargetName="HexValue" Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
+                    <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
     <Border BorderBrush="{DynamicResource WindowFrameBrush}"
             BorderThickness="1"
             Background="{DynamicResource WindowBackgroundBrush}"
@@ -272,10 +306,27 @@
                                Margin="0,0,7,0"
                                FontSize="9"
                                Foreground="{DynamicResource SubtleTextBrush}"
-                               Text="THEME" />
-                    <ComboBox x:Name="ThemeCombo"
-                              Width="116"
-                              SelectionChanged="ThemeCombo_SelectionChanged" />
+                               Text="APP" />
+                    <ComboBox x:Name="AppThemeCombo"
+                              Width="96"
+                              DisplayMemberPath="Title"
+                              SelectionChanged="AppThemeCombo_SelectionChanged" />
+                    <TextBlock VerticalAlignment="Center"
+                               Margin="8,0,7,0"
+                               FontSize="9"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="CODE" />
+                    <ComboBox x:Name="CodeThemeCombo"
+                              Width="96"
+                              DisplayMemberPath="Title"
+                              SelectionChanged="CodeThemeCombo_SelectionChanged" />
+                    <Button Width="36" Height="27"
+                            Margin="4,0,0,0"
+                            Padding="0"
+                            Style="{StaticResource ToolButtonStyle}"
+                            ToolTip="Open theme panel"
+                            Click="OpenThemePanelButton_Click"
+                            Content="EDIT" />
                 </StackPanel>
             </Grid>
 
@@ -284,7 +335,7 @@
                 <avalonEdit:TextEditor x:Name="Editor"
                                        Background="{DynamicResource EditorBackgroundBrush}"
                                        Foreground="{DynamicResource EditorForegroundBrush}"
-                                       LineNumbersForeground="{DynamicResource SubtleTextBrush}"
+                                       LineNumbersForeground="{DynamicResource EditorLineNumberBrush}"
                                        FontFamily="{StaticResource MonoFont}"
                                        FontSize="13.5"
                                        Padding="8,7"
@@ -292,7 +343,36 @@
                                        WordWrap="False"
                                        HorizontalScrollBarVisibility="Auto"
                                        VerticalScrollBarVisibility="Auto"
-                                       TextChanged="Editor_TextChanged" />
+                                       PreviewMouseRightButtonDown="Editor_PreviewMouseRightButtonDown"
+                                       TextChanged="Editor_TextChanged">
+                    <avalonEdit:TextEditor.Resources>
+                        <Style TargetType="ScrollBar"
+                               BasedOn="{StaticResource {x:Type ScrollBar}}">
+                            <Setter Property="Background" Value="{DynamicResource EditorBackgroundBrush}" />
+                        </Style>
+                    </avalonEdit:TextEditor.Resources>
+                    <avalonEdit:TextEditor.ContextMenu>
+                        <ContextMenu x:Name="EditorContextMenu" Opened="EditorContextMenu_Opened">
+                            <MenuItem x:Name="CutMenuItem"
+                                      Header="Cut"
+                                      InputGestureText="Ctrl+X"
+                                      Click="CutMenuItem_Click" />
+                            <MenuItem x:Name="CopyMenuItem"
+                                      Header="Copy"
+                                      InputGestureText="Ctrl+C"
+                                      Click="CopyMenuItem_Click" />
+                            <MenuItem x:Name="PasteMenuItem"
+                                      Header="Paste"
+                                      InputGestureText="Ctrl+V"
+                                      Click="PasteMenuItem_Click" />
+                            <Separator />
+                            <MenuItem x:Name="SelectAllMenuItem"
+                                      Header="Select All"
+                                      InputGestureText="Ctrl+A"
+                                      Click="SelectAllMenuItem_Click" />
+                        </ContextMenu>
+                    </avalonEdit:TextEditor.ContextMenu>
+                </avalonEdit:TextEditor>
 
                 <StackPanel x:Name="EmptyHint"
                             IsHitTestVisible="False"
@@ -413,6 +493,166 @@
                                Text="AUTOSAVED" />
                 </StackPanel>
             </Grid>
+
+            <!-- Theme catalog editor -->
+            <Border x:Name="ThemePanelScrim"
+                    Grid.Row="0" Grid.RowSpan="5"
+                    Panel.ZIndex="90"
+                    Background="{DynamicResource WindowBackgroundBrush}"
+                    Opacity="0.72"
+                    Visibility="Collapsed"
+                    MouseLeftButtonDown="ThemePanelScrim_MouseLeftButtonDown" />
+
+            <Border x:Name="ThemePanel"
+                    Grid.Row="0" Grid.RowSpan="5"
+                    Panel.ZIndex="100"
+                    Width="420"
+                    HorizontalAlignment="Right"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource WindowFrameBrush}"
+                    BorderThickness="1,0,0,0"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="34" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Background="{DynamicResource SurfaceRaisedBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="42" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                            <TextBlock FontSize="13" FontWeight="SemiBold" Text="THEME PANEL" />
+                            <TextBlock Margin="9,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="9"
+                                       Foreground="{DynamicResource SecondaryAccentBrush}"
+                                       Text="APP + CODE" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource WindowButtonStyle}"
+                                ToolTip="Close theme panel"
+                                Click="CloseThemePanelButton_Click"
+                                Content="×" />
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="14,12,16,16">
+                            <TextBlock FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Text="APP THEME / CHROME" />
+                            <TextBlock Margin="0,4,0,10"
+                                       FontSize="9"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="Controls surfaces, accents, text, and the top-to-bottom outer-edge gradient." />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="74" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="AppThemeEditorCombo"
+                                          DisplayMemberPath="Title"
+                                          SelectionChanged="AppThemeEditorCombo_SelectionChanged" />
+                                <Button Grid.Column="1"
+                                        Margin="5,0,0,0"
+                                        Style="{StaticResource ToolButtonStyle}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        Click="NewAppThemeButton_Click"
+                                        Content="NEW" />
+                            </Grid>
+                            <TextBlock Margin="0,10,0,4"
+                                       FontSize="9"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="TITLE" />
+                            <TextBox x:Name="AppThemeTitleBox" />
+                            <ItemsControl x:Name="AppThemeFieldsList"
+                                          Margin="0,7,0,0"
+                                          ItemTemplate="{StaticResource ThemeColorFieldTemplate}" />
+                            <Button Margin="0,10,0,0"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Click="SaveAppThemeButton_Click"
+                                    Content="SAVE APP THEME" />
+
+                            <Border Height="1" Margin="0,18,0,16"
+                                    Background="{DynamicResource BorderBrush}" />
+
+                            <TextBlock FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource SecondaryAccentBrush}"
+                                       Text="CODE THEME / EDITOR" />
+                            <TextBlock Margin="0,4,0,10"
+                                       FontSize="9"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="Controls editor background, foreground, selection, caret, line numbers, and syntax colors." />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="74" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="CodeThemeEditorCombo"
+                                          DisplayMemberPath="Title"
+                                          SelectionChanged="CodeThemeEditorCombo_SelectionChanged" />
+                                <Button Grid.Column="1"
+                                        Margin="5,0,0,0"
+                                        Style="{StaticResource ToolButtonStyle}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        Click="NewCodeThemeButton_Click"
+                                        Content="NEW" />
+                            </Grid>
+                            <TextBlock Margin="0,10,0,4"
+                                       FontSize="9"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="TITLE" />
+                            <TextBox x:Name="CodeThemeTitleBox" />
+                            <ItemsControl x:Name="CodeThemeFieldsList"
+                                          Margin="0,7,0,0"
+                                          ItemTemplate="{StaticResource ThemeColorFieldTemplate}" />
+                            <Button Margin="0,10,0,0"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource PlusTabButtonStyle}"
+                                    Padding="10,5"
+                                    Click="SaveCodeThemeButton_Click"
+                                    Content="SAVE CODE THEME" />
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="2" Background="{DynamicResource SurfaceRaisedBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ThemeEditorStatus"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="9"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   Text="READY" />
+                        <TextBlock x:Name="ThemeFileStatus"
+                                   Grid.Column="1"
+                                   MaxWidth="170"
+                                   Margin="8,0,12,0"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontSize="8"
+                                   Foreground="{DynamicResource SubtleTextBrush}"
+                                   Text="themes.json" />
+                    </Grid>
+                </Grid>
+            </Border>
 
             <Border Grid.Row="0" Height="1" VerticalAlignment="Bottom"
                     Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />

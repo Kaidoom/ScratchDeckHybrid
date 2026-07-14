@@ -5,7 +5,7 @@ namespace Scratchdeck.Models;
 
 public sealed class WorkspaceState
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public ObservableCollection<TabDocument> Tabs { get; set; } = [];
@@ -13,7 +13,8 @@ public sealed class WorkspaceState
     public WindowPlacement Window { get; set; } = new();
     public bool Topmost { get; set; }
     public bool AutoWrap { get; set; } = true;
-    public string Theme { get; set; } = ThemeService.DefaultTheme;
+    public string AppThemeId { get; set; } = ThemeService.DefaultAppThemeId;
+    public string CodeThemeId { get; set; } = ThemeService.DefaultCodeThemeId;
 
     public static WorkspaceState CreateDefault()
     {
@@ -30,7 +31,8 @@ public sealed class WorkspaceState
         }
 
         SelectedTabIndex = Math.Clamp(SelectedTabIndex, 0, Tabs.Count - 1);
-        Theme = ThemeService.IsKnownTheme(Theme) ? Theme : ThemeService.DefaultTheme;
+        AppThemeId = string.IsNullOrWhiteSpace(AppThemeId) ? ThemeService.DefaultAppThemeId : AppThemeId;
+        CodeThemeId = string.IsNullOrWhiteSpace(CodeThemeId) ? ThemeService.DefaultCodeThemeId : CodeThemeId;
         Window.Width = Math.Clamp(Window.Width, 420, 4000);
         Window.Height = Math.Clamp(Window.Height, 280, 2500);
 

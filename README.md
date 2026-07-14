@@ -1,6 +1,6 @@
 # Scratchdeck
 
-Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, and code snippets. It combines a tabbed AvalonEdit workspace with automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and four live-switching themes.
+Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, and code snippets. It combines a tabbed AvalonEdit workspace with automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and independently selectable app and code themes.
 
 ![Scratchdeck preview](docs/Scratchdeck-preview.png)
 
@@ -38,13 +38,14 @@ dotnet publish src/Scratchdeck/Scratchdeck.csproj -c Release -r win-x64 --self-c
 
 The solution is deliberately small:
 
-- `Models/` contains the observable tab model, window placement, and workspace state.
+- `Models/` contains the observable tab model, theme catalog, window placement, and workspace state.
 - `Services/WorkspacePersistenceService.cs` maps the live model to a disk DTO, encrypts protected content, performs atomic replacement, rotates one backup, and recovers malformed workspaces.
 - `Services/DpapiProtectionService.cs` uses Windows DPAPI with `CurrentUser` scope. Protected text can only be decrypted by the same Windows user profile.
 - `Services/SingleInstanceService.cs` uses a per-session mutex and named pipe. A second launch tells the existing window to restore and activate.
 - `Services/SyntaxHighlightingService.cs` builds lightweight AvalonEdit definitions from the active theme palette, validates them against loaded content, and falls back to plain text if a definition is unsafe.
-- `Themes/` centralizes all interface and syntax colours in WPF resource dictionaries.
-- `MainWindow.xaml` and its focused code-behind own the view interactions: tabs, drag reordering, inline rename, search, window chrome, and the 400 ms autosave debounce.
+- `Services/ThemeService.cs` scans, validates, saves, and applies the JSON theme catalog. Its hard-coded Cyberpunk definitions keep the app usable if the catalog is missing or invalid.
+- `Themes/` supplies the static WPF style system and startup fallback resources; runtime colors are layered in from the catalog.
+- `MainWindow.xaml` and its focused code-behind own the view interactions: tabs, drag reordering, inline rename, search, theme editing, window chrome, and the 400 ms autosave debounce.
 
 Workspace data is stored at:
 
@@ -71,10 +72,56 @@ Important: normal tabs are stored as plain text in `workspace.json`. Turn on **L
 | `Ctrl+Shift+P` | Toggle always-on-top |
 | `Ctrl+Z`, `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands |
 
-Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
+Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Right-click in the editor for cursor-aware Cut, Copy, Paste, and Select All commands. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
 
-## Themes and syntax modes
+## App and code themes
 
-The built-in themes are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark. Cyberpunk uses cyan for primary active states and restrained amber for secondary controls, status, and emphasis. Theme changes apply immediately to chrome, controls, editor selection, syntax colours, focus states, scrollbars, and status indicators.
+The **APP** selector controls window chrome, surfaces, labels, controls, status colors, and the top-to-bottom outer-edge gradient. The **CODE** selector independently controls the editor background, foreground, selection, caret, line numbers, and syntax colors. The built-in choices are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark.
+
+Use **EDIT** to open the theme panel. Existing themes can be customized in place, while **NEW** starts a copy of the active theme under a new title. Color values accept `#RRGGBB` or `#AARRGGBB`; invalid values are marked before saving.
+
+Themes are loaded at startup from:
+
+```text
+%LOCALAPPDATA%\Scratchdeck\themes.json
+```
+
+The catalog keeps app and code definitions separate. A shortened example is:
+
+```json
+{
+  "schemaVersion": 1,
+  "appThemes": [
+    {
+      "id": "cyberpunk",
+      "title": "Cyberpunk",
+      "colors": {
+        "background": "#060910",
+        "surface": "#0A1019",
+        "outerEdgeTop": "#19D9F0",
+        "outerEdgeBottom": "#FFC247",
+        "primaryAccent": "#19D9F0",
+        "secondaryAccent": "#FFC247"
+      }
+    }
+  ],
+  "codeThemes": [
+    {
+      "id": "cyberpunk-code",
+      "title": "Cyberpunk",
+      "colors": {
+        "background": "#070C14",
+        "foreground": "#E4EBF0",
+        "keyword": "#50C9FF",
+        "string": "#E2D28A"
+      }
+    }
+  ]
+}
+```
+
+Scratchdeck writes the complete set of color fields when saving. Updates use an atomic temporary file and keep the previous valid catalog as `themes.backup.json`. If neither catalog can be loaded, the hard-coded Cyberpunk catalog is used; on a normal first launch it is also written to `themes.json` for customization.
+
+## Syntax modes
 
 Each tab can use Plain Text, C++, C#, JSON, XML, HTML, PowerShell, Python, JavaScript, Markdown, SQL, Go, or INI highlighting. Text remains plain and is preserved exactly as entered. Unexpected mixed content is validated before a highlighter is activated, so a problematic definition degrades to stable plain-text editing rather than taking down the window.

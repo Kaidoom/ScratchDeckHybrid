@@ -19,7 +19,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var state = new WorkspaceState
         {
             SelectedTabIndex = 1,
-            Theme = "Amber Terminal",
+            AppThemeId = "amber-terminal",
+            CodeThemeId = "matrix-code",
             Topmost = true,
             AutoWrap = false,
             Window = new WindowPlacement
@@ -52,9 +53,11 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
 
         Assert.DoesNotContain("classified-needle-9c7f", json, StringComparison.Ordinal);
         Assert.Contains("protectedContent", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"theme\"", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, restored.Tabs.Count);
         Assert.Equal(1, restored.SelectedTabIndex);
-        Assert.Equal("Amber Terminal", restored.Theme);
+        Assert.Equal("amber-terminal", restored.AppThemeId);
+        Assert.Equal("matrix-code", restored.CodeThemeId);
         Assert.True(restored.Topmost);
         Assert.False(restored.AutoWrap);
         Assert.Equal("dotnet test", restored.Tabs[0].Content);
@@ -102,7 +105,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
 
         Assert.Single(state.Tabs);
         Assert.Equal("QUICK NOTE", state.Tabs[0].Title);
-        Assert.Equal("Cyberpunk", state.Theme);
+        Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
+        Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
         Assert.True(state.AutoWrap);
     }
 
@@ -135,6 +139,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
 
         Assert.True(state.AutoWrap);
         Assert.Equal("kept", state.Tabs[0].Content);
+        Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
+        Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
     }
 
     public void Dispose()

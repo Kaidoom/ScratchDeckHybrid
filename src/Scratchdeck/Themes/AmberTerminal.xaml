@@ -4,7 +4,10 @@
     <SolidColorBrush x:Key="SurfaceBrush" Color="#151008" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1D160B" />
     <SolidColorBrush x:Key="BorderBrush" Color="#493519" />
-    <SolidColorBrush x:Key="WindowFrameBrush" Color="#FFB21D" Opacity="0.55" />
+    <LinearGradientBrush x:Key="WindowFrameBrush" StartPoint="0.5,0" EndPoint="0.5,1">
+        <GradientStop Offset="0" Color="#FFB21D" />
+        <GradientStop Offset="1" Color="#FF6B2D" />
+    </LinearGradientBrush>
     <SolidColorBrush x:Key="AccentBrush" Color="#FFB21D" />
     <SolidColorBrush x:Key="AccentMutedBrush" Color="#FFB21D" Opacity="0.14" />
     <SolidColorBrush x:Key="SecondaryAccentBrush" Color="#FF6B2D" />
@@ -16,6 +19,8 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="#D4D954" />
     <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#0B0906" />
     <SolidColorBrush x:Key="EditorForegroundBrush" Color="#F4E7CA" />
+    <SolidColorBrush x:Key="EditorLineNumberBrush" Color="#716044" />
+    <SolidColorBrush x:Key="EditorCaretBrush" Color="#FFF3D6" />
     <SolidColorBrush x:Key="SelectionBrush" Color="#684719" />
     <SolidColorBrush x:Key="FocusBrush" Color="#FFB21D" />
     <SolidColorBrush x:Key="SyntaxCommentBrush" Color="#7B6C50" />

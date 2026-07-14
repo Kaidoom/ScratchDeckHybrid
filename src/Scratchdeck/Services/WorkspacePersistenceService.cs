@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Scratchdeck.Models;
 
 namespace Scratchdeck.Services;
@@ -132,7 +133,8 @@ public sealed class WorkspacePersistenceService
             },
             Topmost = state.Topmost,
             AutoWrap = state.AutoWrap,
-            Theme = state.Theme,
+            AppThemeId = state.AppThemeId,
+            CodeThemeId = state.CodeThemeId,
             Tabs = state.Tabs.Select(tab => new PersistedTab
             {
                 Id = tab.Id,
@@ -155,7 +157,8 @@ public sealed class WorkspacePersistenceService
             Window = persisted.Window ?? new WindowPlacement(),
             Topmost = persisted.Topmost,
             AutoWrap = persisted.AutoWrap,
-            Theme = persisted.Theme ?? ThemeService.DefaultTheme,
+            AppThemeId = persisted.AppThemeId ?? ThemeService.LegacyAppThemeId(persisted.Theme),
+            CodeThemeId = persisted.CodeThemeId ?? ThemeService.LegacyCodeThemeId(persisted.Theme),
             Tabs = new ObservableCollection<TabDocument>(persisted.Tabs.Select(tab => new TabDocument
             {
                 Id = tab.Id,
@@ -214,6 +217,9 @@ public sealed class WorkspacePersistenceService
         public WindowPlacement? Window { get; set; }
         public bool Topmost { get; set; }
         public bool AutoWrap { get; set; } = true;
+        public string? AppThemeId { get; set; }
+        public string? CodeThemeId { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Theme { get; set; }
     }
 

@@ -21,6 +21,85 @@
         <Setter Property="FontSize" Value="11" />
     </Style>
 
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource WindowFrameBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Padding" Value="9,6" />
+        <Setter Property="MinWidth" Value="170" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="MenuChrome"
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Margin="18,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource MonoFont}"
+                                       FontSize="9"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="{TemplateBinding InputGestureText}" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="MenuChrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.35" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Separator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Margin="6,3"
+                            Background="{DynamicResource BorderBrush}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="ToolButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -202,10 +281,10 @@
     </Style>
 
     <Style TargetType="TextBox">
-        <Setter Property="Background" Value="{DynamicResource EditorBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}" />
-        <Setter Property="SelectionBrush" Value="{DynamicResource SelectionBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentMutedBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="7,4" />
@@ -377,7 +456,7 @@
     </Style>
 
     <ControlTemplate x:Key="VerticalScrollBarTemplate" TargetType="ScrollBar">
-        <Grid Width="9" Background="{DynamicResource EditorBackgroundBrush}">
+        <Grid Width="9" Background="{TemplateBinding Background}">
             <primitives:Track x:Name="PART_Track"
                               Orientation="Vertical"
                               IsDirectionReversed="True"
@@ -403,7 +482,7 @@
     </ControlTemplate>
 
     <ControlTemplate x:Key="HorizontalScrollBarTemplate" TargetType="ScrollBar">
-        <Grid Height="9" Background="{DynamicResource EditorBackgroundBrush}">
+        <Grid Height="9" Background="{TemplateBinding Background}">
             <primitives:Track x:Name="PART_Track"
                               Orientation="Horizontal"
                               IsDirectionReversed="False"
@@ -431,7 +510,7 @@
     <Style TargetType="ScrollBar">
         <Setter Property="Width" Value="9" />
         <Setter Property="MinWidth" Value="9" />
-        <Setter Property="Background" Value="{DynamicResource EditorBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
         <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}" />
         <Style.Triggers>
             <Trigger Property="Orientation" Value="Horizontal">
