@@ -18,6 +18,8 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
         PreviewKeyUp="Window_PreviewKeyUp"
+        PreviewMouseUp="Window_PreviewMouseUp"
+        PreviewStylusUp="Window_PreviewStylusUp"
         Deactivated="Window_Deactivated"
         SourceInitialized="Window_SourceInitialized"
         Closing="Window_Closing"
@@ -317,7 +319,7 @@
                                Text="SIZE" />
                     <ComboBox x:Name="ScratchBrushSizeCombo"
                               Width="48"
-                              ToolTip="Brush size"
+                              ToolTip="Brush and Shift-eraser size"
                               SelectionChanged="ScratchBrushSizeCombo_SelectionChanged" />
                     <Button x:Name="ScratchColorButton"
                             Width="32" Height="27"
@@ -338,7 +340,7 @@
                                   Width="52"
                                   Margin="5,0,0,0"
                                   Style="{StaticResource SecondaryToggleStyle}"
-                                  ToolTip="Erase whole strokes. Hold Shift for temporary erase mode."
+                                  ToolTip="Toggle whole-stroke erase. Hold Shift over the canvas for brush erase."
                                   Checked="ScratchEraseToggle_Changed"
                                   Unchecked="ScratchEraseToggle_Changed"
                                   Content="ERASE" />
@@ -543,6 +545,10 @@
                            ClipToBounds="True"
                            EditingMode="Ink"
                            Visibility="Collapsed"
+                           PreviewMouseDown="ScratchCanvas_PreviewMouseDown"
+                           PreviewStylusDown="ScratchCanvas_PreviewStylusDown"
+                           LostMouseCapture="ScratchCanvas_LostMouseCapture"
+                           LostStylusCapture="ScratchCanvas_LostStylusCapture"
                            StrokeCollected="ScratchCanvas_StrokeCollected"
                            StrokeErasing="ScratchCanvas_StrokeErasing"
                            StrokeErased="ScratchCanvas_StrokeErased" />
@@ -661,7 +667,7 @@
                            FontFamily="{DynamicResource UiFont}"
                            FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource SecondaryAccentBrush}"
-                           Text="CTRL+Z  UNDO   •   HOLD SHIFT  ERASE"
+                           Text="CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE"
                            Visibility="Collapsed" />
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,11,0" VerticalAlignment="Center">

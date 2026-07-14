@@ -38,6 +38,9 @@ public partial class MainWindow : Window
     private bool _isLoadingThemes;
     private bool _isLoadingScratch;
     private bool _isShiftEraseActive;
+    private bool _isScratchPointerDown;
+    private bool _scratchEraseSnapshotRecorded;
+    private bool _scratchEditingModeUpdatePending;
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
@@ -157,7 +160,7 @@ public partial class MainWindow : Window
             e.Key == Key.Z &&
             !ScratchHexColorBox.IsKeyboardFocusWithin)
         {
-            UndoLastScratchStroke();
+            UndoLastScratchAction();
             e.Handled = true;
         }
         else if (_activeTab?.IsScratchMode == true &&
@@ -222,8 +225,27 @@ public partial class MainWindow : Window
         SyncShiftEraseState();
     }
 
+    private void Window_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left && e.StylusDevice is null)
+        {
+            QueueScratchPointerGestureEnd();
+        }
+    }
+
+    private void Window_PreviewStylusUp(object sender, StylusEventArgs e) => QueueScratchPointerGestureEnd();
+
     private void Window_Deactivated(object? sender, EventArgs e)
     {
+        if (ScratchCanvas.IsMouseCaptured)
+        {
+            ScratchCanvas.ReleaseMouseCapture();
+        }
+        if (ScratchCanvas.IsStylusCaptured)
+        {
+            ScratchCanvas.ReleaseStylusCapture();
+        }
+        CancelScratchPointerGesture();
         _isShiftEraseActive = false;
         UpdateScratchEditingMode();
     }
@@ -494,6 +516,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        CancelScratchPointerGesture();
         CommitActiveTab();
         _activeTab.IsScratchMode = scratchMode;
         ApplyTabSurfaceMode();
@@ -525,6 +548,26 @@ public partial class MainWindow : Window
         ScheduleAutosave();
     }
 
+    private void ScratchCanvas_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left && e.StylusDevice is null)
+        {
+            BeginScratchPointerGesture();
+        }
+    }
+
+    private void ScratchCanvas_PreviewStylusDown(object sender, StylusDownEventArgs e) => BeginScratchPointerGesture();
+
+    private void ScratchCanvas_LostMouseCapture(object sender, WpfMouseEventArgs e)
+    {
+        if (e.StylusDevice is null)
+        {
+            QueueScratchPointerGestureEnd();
+        }
+    }
+
+    private void ScratchCanvas_LostStylusCapture(object sender, StylusEventArgs e) => QueueScratchPointerGestureEnd();
+
     private void ScratchCanvas_StrokeErasing(object sender, InkCanvasStrokeErasingEventArgs e)
     {
         if (_isLoadingScratch || _activeTab is null)
@@ -532,8 +575,17 @@ public partial class MainWindow : Window
             return;
         }
 
-        CommitActiveTab();
-        _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
+        if (!_isScratchPointerDown)
+        {
+            BeginScratchPointerGesture();
+        }
+
+        if (!_scratchEraseSnapshotRecorded)
+        {
+            CommitActiveTab();
+            _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
+            _scratchEraseSnapshotRecorded = true;
+        }
     }
 
     private void ScratchCanvas_StrokeErased(object sender, RoutedEventArgs e)
@@ -547,13 +599,14 @@ public partial class MainWindow : Window
         ScheduleAutosave();
     }
 
-    private void UndoLastScratchStroke()
+    private void UndoLastScratchAction()
     {
-        if (_activeTab is null)
+        if (_activeTab is null || _isScratchPointerDown)
         {
             return;
         }
 
+        CancelScratchPointerGesture();
         if (_scratchUndoHistory.TryPop(_activeTab.Id, out var snapshot))
         {
             _isLoadingScratch = true;
@@ -592,11 +645,30 @@ public partial class MainWindow : Window
     private void UpdateScratchEditingMode()
     {
         var scratchMode = _activeTab?.IsScratchMode == true;
-        var isErasing = scratchMode && (_isShiftEraseActive || ScratchEraseToggle.IsChecked == true);
-        ScratchCanvas.EditingMode = isErasing ? InkCanvasEditingMode.EraseByStroke : InkCanvasEditingMode.Ink;
-        ScratchHintStatus.Text = isErasing
-            ? "ERASING BY STROKE   •   CTRL+Z  UNDO"
-            : "CTRL+Z  UNDO   •   HOLD SHIFT  ERASE";
+        var editingMode = !scratchMode
+            ? InkCanvasEditingMode.Ink
+            : _isShiftEraseActive
+                ? InkCanvasEditingMode.EraseByPoint
+                : ScratchEraseToggle.IsChecked == true
+                    ? InkCanvasEditingMode.EraseByStroke
+                    : InkCanvasEditingMode.Ink;
+
+        if (_isScratchPointerDown && ScratchCanvas.EditingMode != editingMode)
+        {
+            _scratchEditingModeUpdatePending = true;
+            return;
+        }
+
+        _scratchEditingModeUpdatePending = false;
+        ScratchCanvas.EditingMode = editingMode;
+        ScratchHintStatus.Text = editingMode switch
+        {
+            InkCanvasEditingMode.EraseByPoint =>
+                $"BRUSH ERASE  {_activeTab?.ScratchBrushSize ?? ScratchPaletteService.DefaultBrushSize:0.#} PX   •   CTRL+Z  UNDO",
+            InkCanvasEditingMode.EraseByStroke =>
+                "STROKE ERASE   •   HOLD SHIFT  BRUSH   •   CTRL+Z  UNDO",
+            _ => "CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE"
+        };
     }
 
     private void SyncShiftEraseState()
@@ -606,6 +678,40 @@ public partial class MainWindow : Window
         UpdateScratchEditingMode();
     }
 
+    private void BeginScratchPointerGesture()
+    {
+        if (_isScratchPointerDown || _isLoadingScratch || _activeTab?.IsScratchMode != true)
+        {
+            return;
+        }
+
+        _isScratchPointerDown = true;
+        _scratchEraseSnapshotRecorded = false;
+    }
+
+    private void QueueScratchPointerGestureEnd()
+    {
+        if (_isScratchPointerDown || _scratchEditingModeUpdatePending)
+        {
+            Dispatcher.BeginInvoke(FinishScratchPointerGesture, DispatcherPriority.Input);
+        }
+    }
+
+    private void FinishScratchPointerGesture()
+    {
+        _isScratchPointerDown = false;
+        _scratchEraseSnapshotRecorded = false;
+        _scratchEditingModeUpdatePending = false;
+        UpdateScratchEditingMode();
+    }
+
+    private void CancelScratchPointerGesture()
+    {
+        _isScratchPointerDown = false;
+        _scratchEraseSnapshotRecorded = false;
+        _scratchEditingModeUpdatePending = false;
+    }
+
     private void ClearScratchButton_Click(object sender, RoutedEventArgs e)
     {
         if (_activeTab is null || ScratchCanvas.Strokes.Count == 0)
@@ -613,6 +719,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        CancelScratchPointerGesture();
         CommitActiveTab();
         _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
         ScratchCanvas.Strokes.Clear();
@@ -631,6 +738,7 @@ public partial class MainWindow : Window
 
         _activeTab.ScratchBrushSize = size;
         ApplyScratchDrawingAttributes();
+        UpdateScratchEditingMode();
         ScheduleAutosave();
     }
 
@@ -709,6 +817,9 @@ public partial class MainWindow : Window
             FitToCurve = true,
             IgnorePressure = true
         };
+        ScratchCanvas.EraserShape = new EllipseStylusShape(
+            _activeTab.ScratchBrushSize,
+            _activeTab.ScratchBrushSize);
         var swatch = new SolidColorBrush(color);
         swatch.Freeze();
         ScratchColorSwatch.Background = swatch;
@@ -870,6 +981,7 @@ public partial class MainWindow : Window
 
         if (_activeTab is not null)
         {
+            CancelScratchPointerGesture();
             CommitActiveTab();
         }
 
