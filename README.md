@@ -71,7 +71,8 @@ Important: normal tabs store text directly and drawings as Base64 ink data in `w
 | `F3` / `Shift+F3` | Next / previous search match |
 | `Escape` | Close search or cancel a tab rename |
 | `Ctrl+Shift+P` | Toggle always-on-top |
-| `Ctrl+Z` | Undo text normally, or remove the most recent stroke in Scratch mode |
+| `Ctrl+Z` | Undo text normally, or undo the latest draw, erase, or clear action in Scratch mode |
+| Hold `Shift` | Temporarily erase whole strokes while using the Scratch canvas |
 | `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands in Text mode |
 
 Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Right-click in the editor for cursor-aware Cut, Copy, Paste, and Select All commands. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
@@ -80,7 +81,9 @@ Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** be
 
 Every tab contains two separate payloads. **TEXT** shows the existing AvalonEdit document, while **SCRATCH** opens a native WPF ink canvas; switching surfaces never draws over or alters the text. The last surface, brush size, selected color, and strokes are restored per tab.
 
-Scratch mode provides brush-size presets and a color button that opens a fixed 5×5 palette. The first ten slots contain common colors and the remaining slots start white for customization. Select a slot, enter a `#RRGGBB` or `#AARRGGBB` value, and choose **ADD** to replace that slot. Custom palette colors persist with the workspace. The status bar changes to show the current `Ctrl+Z` undo hint while drawing.
+Scratch mode provides brush-size presets and a color button that opens a fixed 5×5 palette. The first ten slots contain common colors and the remaining slots start white for customization. Select a slot, enter a `#RRGGBB` or `#AARRGGBB` value, and choose **ADD** to replace that slot. Custom palette colors persist with the workspace.
+
+Use **ERASE** for a latched whole-stroke eraser, or hold `Shift` for temporary erase mode. **CLEAR** empties the board as one reversible action. `Ctrl+Z` restores the most recent draw, erased stroke, or cleared board, with up to 20 in-memory actions retained per tab. The Scratch status bar displays the undo and Shift hints.
 
 ## App and code themes
 

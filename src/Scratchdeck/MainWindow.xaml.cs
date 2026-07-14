@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly WorkspaceState _state;
     private readonly WorkspacePersistenceService _persistence;
     private readonly ThemeService _themes;
+    private readonly ScratchUndoHistory _scratchUndoHistory = new();
     private readonly ObservableCollection<ScratchPaletteSlot> _scratchPaletteSlots = [];
     private readonly double[] _scratchBrushSizes = [2, 4, 6, 10, 14, 20, 28, 40];
     private CancellationTokenSource? _autosaveCancellation;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     private bool _isLoadingEditor;
     private bool _isLoadingThemes;
     private bool _isLoadingScratch;
+    private bool _isShiftEraseActive;
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
@@ -158,6 +160,11 @@ public partial class MainWindow : Window
             UndoLastScratchStroke();
             e.Handled = true;
         }
+        else if (_activeTab?.IsScratchMode == true &&
+                 e.Key is Key.LeftShift or Key.RightShift)
+        {
+            SyncShiftEraseState();
+        }
         else if (modifiers == ModifierKeys.Control && e.Key == Key.T)
         {
             CreateNewTab();
@@ -203,6 +210,22 @@ public partial class MainWindow : Window
             FindMatch(!modifiers.HasFlag(ModifierKeys.Shift));
             e.Handled = true;
         }
+    }
+
+    private void Window_PreviewKeyUp(object sender, WpfKeyEventArgs e)
+    {
+        if (e.Key is not (Key.LeftShift or Key.RightShift))
+        {
+            return;
+        }
+
+        SyncShiftEraseState();
+    }
+
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        _isShiftEraseActive = false;
+        UpdateScratchEditingMode();
     }
 
     private void CreateNewTab()
@@ -257,6 +280,7 @@ public partial class MainWindow : Window
 
         var index = _state.Tabs.IndexOf(tab);
         _state.Tabs.Remove(tab);
+        _scratchUndoHistory.Forget(tab.Id);
         if (_state.Tabs.Count == 0)
         {
             _state.Tabs.Add(new TabDocument { Title = "QUICK NOTE" });
@@ -316,6 +340,7 @@ public partial class MainWindow : Window
         var paletteIndex = _state.ScratchPalette.FindIndex(color =>
             color.Equals(_activeTab.ScratchBrushColor, StringComparison.OrdinalIgnoreCase));
         ScratchPaletteList.SelectedIndex = paletteIndex >= 0 ? paletteIndex : 0;
+        ScratchEraseToggle.IsChecked = false;
         ApplyScratchDrawingAttributes();
         _isLoadingScratch = false;
     }
@@ -445,9 +470,16 @@ public partial class MainWindow : Window
         ScratchHintStatus.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
         if (scratchMode)
         {
+            _isShiftEraseActive = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
             SearchPanel.Visibility = Visibility.Collapsed;
             SearchFeedback.Text = string.Empty;
         }
+        else
+        {
+            _isShiftEraseActive = false;
+            ScratchEraseToggle.IsChecked = false;
+        }
+        UpdateScratchEditingMode();
         UpdateEmptyHint();
     }
 
@@ -488,20 +520,105 @@ public partial class MainWindow : Window
             return;
         }
 
+        _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
+        CommitActiveTab();
+        ScheduleAutosave();
+    }
+
+    private void ScratchCanvas_StrokeErasing(object sender, InkCanvasStrokeErasingEventArgs e)
+    {
+        if (_isLoadingScratch || _activeTab is null)
+        {
+            return;
+        }
+
+        CommitActiveTab();
+        _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
+    }
+
+    private void ScratchCanvas_StrokeErased(object sender, RoutedEventArgs e)
+    {
+        if (_isLoadingScratch || _activeTab is null)
+        {
+            return;
+        }
+
         CommitActiveTab();
         ScheduleAutosave();
     }
 
     private void UndoLastScratchStroke()
     {
-        if (ScratchCanvas.Strokes.Count == 0)
+        if (_activeTab is null)
         {
             return;
         }
 
-        ScratchCanvas.Strokes.RemoveAt(ScratchCanvas.Strokes.Count - 1);
+        if (_scratchUndoHistory.TryPop(_activeTab.Id, out var snapshot))
+        {
+            _isLoadingScratch = true;
+            try
+            {
+                ScratchCanvas.Strokes = InkStrokeSerializationService.Deserialize(snapshot);
+            }
+            finally
+            {
+                _isLoadingScratch = false;
+            }
+        }
+        else if (ScratchCanvas.Strokes.Count > 0)
+        {
+            // A restored workspace has no in-memory action history. Preserve the
+            // original single-stroke undo behavior as a useful fallback.
+            ScratchCanvas.Strokes.RemoveAt(ScratchCanvas.Strokes.Count - 1);
+        }
+        else
+        {
+            return;
+        }
+
         CommitActiveTab();
         ScheduleAutosave();
+    }
+
+    private void ScratchEraseToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isLoadingScratch)
+        {
+            UpdateScratchEditingMode();
+        }
+    }
+
+    private void UpdateScratchEditingMode()
+    {
+        var scratchMode = _activeTab?.IsScratchMode == true;
+        var isErasing = scratchMode && (_isShiftEraseActive || ScratchEraseToggle.IsChecked == true);
+        ScratchCanvas.EditingMode = isErasing ? InkCanvasEditingMode.EraseByStroke : InkCanvasEditingMode.Ink;
+        ScratchHintStatus.Text = isErasing
+            ? "ERASING BY STROKE   •   CTRL+Z  UNDO"
+            : "CTRL+Z  UNDO   •   HOLD SHIFT  ERASE";
+    }
+
+    private void SyncShiftEraseState()
+    {
+        _isShiftEraseActive = _activeTab?.IsScratchMode == true &&
+                              (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift));
+        UpdateScratchEditingMode();
+    }
+
+    private void ClearScratchButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeTab is null || ScratchCanvas.Strokes.Count == 0)
+        {
+            return;
+        }
+
+        CommitActiveTab();
+        _scratchUndoHistory.Record(_activeTab.Id, _activeTab.ScratchData);
+        ScratchCanvas.Strokes.Clear();
+        CommitActiveTab();
+        ScheduleAutosave();
+        ScratchCanvas.Focus();
     }
 
     private void ScratchBrushSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
