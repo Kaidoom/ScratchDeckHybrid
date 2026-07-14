@@ -73,6 +73,7 @@ Important: normal tabs store text directly and drawings as Base64 ink data in `w
 | `Ctrl+Shift+P` | Toggle always-on-top |
 | `Ctrl+Z` | Undo text normally, or undo the latest draw, erase, or clear action in Scratch mode |
 | Hold `Shift` | Temporarily brush-erase parts of strokes on the Scratch canvas |
+| Hold `Alt` | Temporarily erase whole strokes on the Scratch canvas |
 | `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands in Text mode |
 
 Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Right-click in the editor for cursor-aware Cut, Copy, Paste, and Select All commands. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
@@ -83,7 +84,7 @@ Every tab contains two separate payloads. **TEXT** shows the existing AvalonEdit
 
 Scratch mode provides brush-size presets and a color button that opens a fixed 5×5 palette. The first ten slots contain common colors and the remaining slots start white for customization. Select a slot, enter a `#RRGGBB` or `#AARRGGBB` value, and choose **ADD** to replace that slot. Custom palette colors persist with the workspace.
 
-Use **ERASE** for the latched whole-stroke eraser, or hold `Shift` for a temporary circular brush eraser. The current size preset controls both the drawing brush and brush eraser. A continuous erase pass is one undo action. **CLEAR** empties the board as one reversible action. `Ctrl+Z` restores the most recent draw, erase pass, or cleared board, with up to 20 in-memory actions retained per tab. The Scratch status bar displays the active erase mode, eraser size, undo shortcut, and Shift hint.
+Hold `Shift` for a temporary circular brush eraser, or hold `Alt` for a temporary whole-stroke eraser. The current size preset controls both the drawing brush and brush eraser. A continuous erase pass is one undo action. **CLEAR** empties the board as one reversible action. `Ctrl+Z` restores the most recent draw, erase pass, or cleared board, with up to 20 in-memory actions retained per tab. The Scratch status bar displays the active erase mode, eraser size, undo shortcut, and modifier hints.
 
 ## App and code themes
 

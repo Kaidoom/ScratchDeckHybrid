@@ -117,18 +117,22 @@
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <ToggleButton x:Name="WrapToggle"
                                   Width="50" Height="38"
-                                  Style="{StaticResource SecondaryToggleStyle}"
+                                  Style="{StaticResource AccentEdgeToggleStyle}"
                                   ToolTip="Wrap long lines inside the editor"
                                   Checked="WrapToggle_Changed"
-                                  Unchecked="WrapToggle_Changed"
-                                  Content="WRAP" />
+                                  Unchecked="WrapToggle_Changed">
+                        <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                   Text="WRAP" />
+                    </ToggleButton>
                     <ToggleButton x:Name="PinToggle"
                                   Width="44" Height="38"
-                                  Style="{StaticResource ToolToggleStyle}"
+                                  Style="{StaticResource AccentEdgeToggleStyle}"
                                   ToolTip="Always on top (Ctrl+Shift+P)"
                                   Checked="PinToggle_Changed"
-                                  Unchecked="PinToggle_Changed"
-                                  Content="PIN" />
+                                  Unchecked="PinToggle_Changed">
+                        <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                   Text="PIN" />
+                    </ToggleButton>
                     <Button Style="{StaticResource WindowButtonStyle}"
                             ToolTip="Minimise"
                             Click="MinimiseButton_Click"
@@ -258,7 +262,7 @@
                                     <Setter TargetName="TabChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="ActiveLine" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="ActiveCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
-                                    <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                    <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource AccentBrush}" />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
@@ -280,7 +284,7 @@
                 <StackPanel x:Name="TextToolsPanel"
                             Grid.Column="0" Grid.ColumnSpan="3"
                             Orientation="Horizontal"
-                            Margin="10,0,0,0"
+                            Margin="8,0,0,0"
                             VerticalAlignment="Center">
                     <TextBlock VerticalAlignment="Center"
                                Margin="0,0,7,0"
@@ -288,23 +292,29 @@
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="MODE" />
                     <ComboBox x:Name="SyntaxCombo"
-                              Width="112"
+                              Width="100"
                               SelectionChanged="SyntaxCombo_SelectionChanged" />
-                    <Border Width="1" Height="17" Margin="9,0"
+                    <Border Width="1" Height="17" Margin="5,0"
                             Background="{DynamicResource BorderBrush}" />
                     <ToggleButton x:Name="LineNumbersToggle"
-                                  Style="{StaticResource ToolToggleStyle}"
+                                  Style="{StaticResource AccentEdgeToggleStyle}"
+                                  Padding="6,4"
                                   ToolTip="Show line numbers"
                                   Checked="LineNumbersToggle_Changed"
-                                  Unchecked="LineNumbersToggle_Changed"
-                                  Content="LINES" />
+                                  Unchecked="LineNumbersToggle_Changed">
+                        <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                   Text="LINES" />
+                    </ToggleButton>
                     <ToggleButton x:Name="ProtectedToggle"
                                   Margin="3,0,0,0"
                                   Style="{StaticResource SecondaryToggleStyle}"
+                                  Padding="6,4"
                                   ToolTip="Encrypt both text and scratch data for this tab with Windows DPAPI."
                                   Checked="ProtectedToggle_Changed"
-                                  Unchecked="ProtectedToggle_Changed"
-                                  Content="LOCK" />
+                                  Unchecked="ProtectedToggle_Changed">
+                        <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                   Text="LOCK" />
+                    </ToggleButton>
                 </StackPanel>
 
                 <StackPanel x:Name="ScratchToolsPanel"
@@ -336,17 +346,9 @@
                                 BorderThickness="1"
                                 Background="{DynamicResource AccentBrush}" />
                     </Button>
-                    <ToggleButton x:Name="ScratchEraseToggle"
-                                  Width="52"
-                                  Margin="5,0,0,0"
-                                  Style="{StaticResource SecondaryToggleStyle}"
-                                  ToolTip="Toggle whole-stroke erase. Hold Shift over the canvas for brush erase."
-                                  Checked="ScratchEraseToggle_Changed"
-                                  Unchecked="ScratchEraseToggle_Changed"
-                                  Content="ERASE" />
                     <Button Width="48"
                             Height="27"
-                            Margin="4,0,0,0"
+                            Margin="5,0,0,0"
                             Padding="3,4"
                             Style="{StaticResource ToolButtonStyle}"
                             Foreground="{DynamicResource SecondaryAccentBrush}"
@@ -456,14 +458,18 @@
                                      GroupName="TabSurfaceMode"
                                      Style="{StaticResource SegmentRadioStyle}"
                                      BorderThickness="0,0,1,0"
-                                     Checked="TextSurfaceModeRadio_Checked"
-                                     Content="TEXT" />
+                                     Checked="TextSurfaceModeRadio_Checked">
+                            <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                       Text="TEXT" />
+                        </RadioButton>
                         <RadioButton x:Name="ScratchSurfaceModeRadio"
                                      GroupName="TabSurfaceMode"
                                      Style="{StaticResource SegmentRadioStyle}"
                                      BorderThickness="0"
-                                     Checked="ScratchSurfaceModeRadio_Checked"
-                                     Content="SCRATCH" />
+                                     Checked="ScratchSurfaceModeRadio_Checked">
+                            <TextBlock Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                       Text="SCRATCH" />
+                        </RadioButton>
                     </StackPanel>
                 </Border>
 
@@ -544,6 +550,7 @@
                            Background="{DynamicResource EditorBackgroundBrush}"
                            ClipToBounds="True"
                            EditingMode="Ink"
+                           UseCustomCursor="False"
                            Visibility="Collapsed"
                            PreviewMouseDown="ScratchCanvas_PreviewMouseDown"
                            PreviewStylusDown="ScratchCanvas_PreviewStylusDown"
@@ -667,7 +674,7 @@
                            FontFamily="{DynamicResource UiFont}"
                            FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource SecondaryAccentBrush}"
-                           Text="CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE"
+                           Text="CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE   •   HOLD ALT  STROKE ERASE"
                            Visibility="Collapsed" />
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,11,0" VerticalAlignment="Center">

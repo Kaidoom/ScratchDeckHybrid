@@ -7,6 +7,7 @@
     <FontFamily x:Key="CodeFont">Cascadia Mono, Consolas</FontFamily>
     <sys:Double x:Key="AppFontSize">11</sys:Double>
     <sys:Double x:Key="CodeFontSize">13.5</sys:Double>
+    <StreamGeometry x:Key="SelectedCornerGeometry">M0,0 L7,0 L7,7 Z</StreamGeometry>
 
     <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
@@ -213,13 +214,23 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="Chrome"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Path x:Name="SelectedCut"
+                              Width="7" Height="7"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              Data="{StaticResource SelectedCornerGeometry}"
+                              Fill="Transparent"
+                              IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
@@ -229,6 +240,7 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             <Setter TargetName="Chrome" Property="BorderThickness" Value="1,0,1,1" />
+                            <Setter TargetName="SelectedCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -238,6 +250,16 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="AccentEdgeToggleStyle"
+           TargetType="ToggleButton"
+           BasedOn="{StaticResource ToolToggleStyle}">
+        <Style.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource SecondaryAccentBrush}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="SecondaryToggleStyle" TargetType="ToggleButton">
@@ -255,13 +277,23 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="Chrome"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Path x:Name="SelectedCut"
+                              Width="7" Height="7"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              Data="{StaticResource SelectedCornerGeometry}"
+                              Fill="Transparent"
+                              IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SecondaryAccentMutedBrush}" />
@@ -271,6 +303,7 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SecondaryAccentMutedBrush}" />
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource SecondaryAccentBrush}" />
                             <Setter TargetName="Chrome" Property="BorderThickness" Value="1,0,1,1" />
+                            <Setter TargetName="SelectedCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource SecondaryAccentBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -297,15 +330,24 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Chrome"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <Path x:Name="SelectedCut"
+                              Width="7" Height="7"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              Data="{StaticResource SelectedCornerGeometry}"
+                              Fill="Transparent"
+                              IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
@@ -314,7 +356,9 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="1,0,1,1" />
+                            <Setter TargetName="SelectedCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource SecondaryAccentBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

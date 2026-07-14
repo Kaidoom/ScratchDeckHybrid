@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private bool _isLoadingThemes;
     private bool _isLoadingScratch;
     private bool _isShiftEraseActive;
+    private bool _isAltEraseActive;
     private bool _isScratchPointerDown;
     private bool _scratchEraseSnapshotRecorded;
     private bool _scratchEditingModeUpdatePending;
@@ -154,61 +155,68 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, WpfKeyEventArgs e)
     {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
         if (_activeTab?.IsScratchMode == true &&
             modifiers == ModifierKeys.Control &&
-            e.Key == Key.Z &&
+            key == Key.Z &&
             !ScratchHexColorBox.IsKeyboardFocusWithin)
         {
             UndoLastScratchAction();
             e.Handled = true;
         }
         else if (_activeTab?.IsScratchMode == true &&
-                 e.Key is Key.LeftShift or Key.RightShift)
+                 key is Key.LeftShift or Key.RightShift)
         {
-            SyncShiftEraseState();
+            SyncScratchEraseModifierState();
         }
-        else if (modifiers == ModifierKeys.Control && e.Key == Key.T)
+        else if (_activeTab?.IsScratchMode == true &&
+                 key is Key.LeftAlt or Key.RightAlt)
+        {
+            SyncScratchEraseModifierState();
+            e.Handled = true;
+        }
+        else if (modifiers == ModifierKeys.Control && key == Key.T)
         {
             CreateNewTab();
             e.Handled = true;
         }
-        else if (modifiers == ModifierKeys.Control && e.Key == Key.W)
+        else if (modifiers == ModifierKeys.Control && key == Key.W)
         {
             CloseTab(_activeTab);
             e.Handled = true;
         }
-        else if (modifiers.HasFlag(ModifierKeys.Control) && e.Key == Key.Tab)
+        else if (modifiers.HasFlag(ModifierKeys.Control) && key == Key.Tab)
         {
             CycleTabs(modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1);
             e.Handled = true;
         }
-        else if (modifiers == ModifierKeys.Control && e.Key == Key.F && _activeTab?.IsScratchMode != true)
+        else if (modifiers == ModifierKeys.Control && key == Key.F && _activeTab?.IsScratchMode != true)
         {
             OpenSearch();
             e.Handled = true;
         }
-        else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.P)
+        else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.P)
         {
             PinToggle.IsChecked = !(PinToggle.IsChecked ?? false);
             e.Handled = true;
         }
-        else if (e.Key == Key.Escape && ScratchColorPopup.IsOpen)
+        else if (key == Key.Escape && ScratchColorPopup.IsOpen)
         {
             ScratchColorPopup.IsOpen = false;
             e.Handled = true;
         }
-        else if (e.Key == Key.Escape && ThemePanel.Visibility == Visibility.Visible)
+        else if (key == Key.Escape && ThemePanel.Visibility == Visibility.Visible)
         {
             CloseThemePanel();
             e.Handled = true;
         }
-        else if (e.Key == Key.Escape && SearchPanel.Visibility == Visibility.Visible)
+        else if (key == Key.Escape && SearchPanel.Visibility == Visibility.Visible)
         {
             CloseSearch();
             e.Handled = true;
         }
-        else if (e.Key == Key.F3 && _activeTab?.IsScratchMode != true)
+        else if (key == Key.F3 && _activeTab?.IsScratchMode != true)
         {
             FindMatch(!modifiers.HasFlag(ModifierKeys.Shift));
             e.Handled = true;
@@ -217,12 +225,18 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyUp(object sender, WpfKeyEventArgs e)
     {
-        if (e.Key is not (Key.LeftShift or Key.RightShift))
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.LeftShift or Key.RightShift)
         {
+            SyncScratchEraseModifierState();
             return;
         }
 
-        SyncShiftEraseState();
+        if (_activeTab?.IsScratchMode == true && key is Key.LeftAlt or Key.RightAlt)
+        {
+            SyncScratchEraseModifierState();
+            e.Handled = true;
+        }
     }
 
     private void Window_PreviewMouseUp(object sender, MouseButtonEventArgs e)
@@ -247,6 +261,7 @@ public partial class MainWindow : Window
         }
         CancelScratchPointerGesture();
         _isShiftEraseActive = false;
+        _isAltEraseActive = false;
         UpdateScratchEditingMode();
     }
 
@@ -362,7 +377,6 @@ public partial class MainWindow : Window
         var paletteIndex = _state.ScratchPalette.FindIndex(color =>
             color.Equals(_activeTab.ScratchBrushColor, StringComparison.OrdinalIgnoreCase));
         ScratchPaletteList.SelectedIndex = paletteIndex >= 0 ? paletteIndex : 0;
-        ScratchEraseToggle.IsChecked = false;
         ApplyScratchDrawingAttributes();
         _isLoadingScratch = false;
     }
@@ -493,13 +507,14 @@ public partial class MainWindow : Window
         if (scratchMode)
         {
             _isShiftEraseActive = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+            _isAltEraseActive = Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt);
             SearchPanel.Visibility = Visibility.Collapsed;
             SearchFeedback.Text = string.Empty;
         }
         else
         {
             _isShiftEraseActive = false;
-            ScratchEraseToggle.IsChecked = false;
+            _isAltEraseActive = false;
         }
         UpdateScratchEditingMode();
         UpdateEmptyHint();
@@ -634,14 +649,6 @@ public partial class MainWindow : Window
         ScheduleAutosave();
     }
 
-    private void ScratchEraseToggle_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_isLoadingScratch)
-        {
-            UpdateScratchEditingMode();
-        }
-    }
-
     private void UpdateScratchEditingMode()
     {
         var scratchMode = _activeTab?.IsScratchMode == true;
@@ -649,7 +656,7 @@ public partial class MainWindow : Window
             ? InkCanvasEditingMode.Ink
             : _isShiftEraseActive
                 ? InkCanvasEditingMode.EraseByPoint
-                : ScratchEraseToggle.IsChecked == true
+                : _isAltEraseActive
                     ? InkCanvasEditingMode.EraseByStroke
                     : InkCanvasEditingMode.Ink;
 
@@ -664,17 +671,19 @@ public partial class MainWindow : Window
         ScratchHintStatus.Text = editingMode switch
         {
             InkCanvasEditingMode.EraseByPoint =>
-                $"BRUSH ERASE  {_activeTab?.ScratchBrushSize ?? ScratchPaletteService.DefaultBrushSize:0.#} PX   •   CTRL+Z  UNDO",
+                $"SHIFT: BRUSH ERASE  {_activeTab?.ScratchBrushSize ?? ScratchPaletteService.DefaultBrushSize:0.#} PX   •   CTRL+Z  UNDO",
             InkCanvasEditingMode.EraseByStroke =>
-                "STROKE ERASE   •   HOLD SHIFT  BRUSH   •   CTRL+Z  UNDO",
-            _ => "CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE"
+                "ALT: STROKE ERASE   •   CTRL+Z  UNDO",
+            _ => "CTRL+Z  UNDO   •   HOLD SHIFT  BRUSH ERASE   •   HOLD ALT  STROKE ERASE"
         };
     }
 
-    private void SyncShiftEraseState()
+    private void SyncScratchEraseModifierState()
     {
         _isShiftEraseActive = _activeTab?.IsScratchMode == true &&
                               (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift));
+        _isAltEraseActive = _activeTab?.IsScratchMode == true &&
+                            (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt));
         UpdateScratchEditingMode();
     }
 
