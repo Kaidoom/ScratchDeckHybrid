@@ -131,6 +131,7 @@ public sealed class WorkspacePersistenceService
                 WasMaximized = state.Window.WasMaximized
             },
             Topmost = state.Topmost,
+            AutoWrap = state.AutoWrap,
             Theme = state.Theme,
             Tabs = state.Tabs.Select(tab => new PersistedTab
             {
@@ -153,6 +154,7 @@ public sealed class WorkspacePersistenceService
             SelectedTabIndex = persisted.SelectedTabIndex,
             Window = persisted.Window ?? new WindowPlacement(),
             Topmost = persisted.Topmost,
+            AutoWrap = persisted.AutoWrap,
             Theme = persisted.Theme ?? ThemeService.DefaultTheme,
             Tabs = new ObservableCollection<TabDocument>(persisted.Tabs.Select(tab => new TabDocument
             {
@@ -211,6 +213,7 @@ public sealed class WorkspacePersistenceService
         public int SelectedTabIndex { get; set; }
         public WindowPlacement? Window { get; set; }
         public bool Topmost { get; set; }
+        public bool AutoWrap { get; set; } = true;
         public string? Theme { get; set; }
     }
 

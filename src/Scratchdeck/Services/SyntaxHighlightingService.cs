@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Xml.Linq;
+using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using MediaColor = System.Windows.Media.Color;
@@ -13,7 +14,7 @@ public static class SyntaxHighlightingService
 
     public static IReadOnlyList<string> Modes { get; } =
     [
-        "Plain Text", "C++", "C#", "JSON", "XML", "PowerShell", "Python",
+        "Plain Text", "C++", "C#", "JSON", "XML", "HTML", "PowerShell", "Python",
         "JavaScript", "Markdown", "SQL", "Go", "INI"
     ];
 
@@ -40,6 +41,7 @@ public static class SyntaxHighlightingService
                 "break default func interface select case defer go map struct chan else goto package switch const fallthrough if range type continue for import return var true false nil"),
             "JSON" => CreateJson(mode, palette),
             "XML" => CreateXml(mode, palette),
+            "HTML" => CreateHtml(mode, palette),
             "PowerShell" => CreatePowerShell(mode, palette),
             "Python" => CreatePython(mode, palette),
             "Markdown" => CreateMarkdown(mode, palette),
@@ -50,6 +52,36 @@ public static class SyntaxHighlightingService
 
         using var reader = definition.CreateReader();
         return HighlightingLoader.Load(reader, HighlightingManager.Instance);
+    }
+
+    public static bool TryGetDefinition(
+        string mode,
+        string content,
+        out IHighlightingDefinition? definition,
+        out Exception? error)
+    {
+        try
+        {
+            definition = GetDefinition(mode);
+            if (definition is not null)
+            {
+                var document = new TextDocument(content);
+                using var highlighter = new DocumentHighlighter(document, definition);
+                for (var line = 1; line <= document.LineCount; line++)
+                {
+                    highlighter.HighlightLine(line);
+                }
+            }
+
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            definition = null;
+            error = ex;
+            return false;
+        }
     }
 
     private static XDocument CreateBase(string name, Palette palette, XElement ruleSet)
@@ -68,7 +100,7 @@ public static class SyntaxHighlightingService
     private static XDocument CreateCStyle(string name, Palette palette, string keywords)
     {
         var rules = RuleSet();
-        rules.Add(Span("Comment", "//"));
+        rules.Add(Rule("Comment", @"//.*$"));
         rules.Add(Span("Comment", @"/\*", @"\*/", multiline: true));
         rules.Add(Span("String", "\"", "\""));
         rules.Add(Span("String", "'", "'"));
@@ -100,11 +132,25 @@ public static class SyntaxHighlightingService
         return CreateBase(name, palette, rules);
     }
 
+    private static XDocument CreateHtml(string name, Palette palette)
+    {
+        var rules = RuleSet(ignoreCase: true);
+        rules.Add(Span("Comment", "<!--", "-->", multiline: true));
+        rules.Add(Rule("Keyword", @"<!DOCTYPE\s+[^>]+>"));
+        rules.Add(Rule("Keyword", @"</?[A-Za-z][\w:.-]*"));
+        rules.Add(Rule("Keyword", @"/?>"));
+        rules.Add(Rule("Type", @"\b[A-Za-z_:][\w:.-]*(?=\s*=)"));
+        rules.Add(Span("String", "\"", "\""));
+        rules.Add(Span("String", "'", "'"));
+        rules.Add(Rule("Number", @"&(?:\#\d+|\#x[0-9a-f]+|[a-z][a-z0-9]+);"));
+        return CreateBase(name, palette, rules);
+    }
+
     private static XDocument CreatePowerShell(string name, Palette palette)
     {
         var rules = RuleSet(ignoreCase: true);
-        rules.Add(Span("Comment", "#"));
-        rules.Add(Span("Comment", "<#", "#>", multiline: true));
+        rules.Add(Rule("Comment", @"\#.*$"));
+        rules.Add(Span("Comment", @"<\#", @"\#>", multiline: true));
         rules.Add(Span("String", "\"", "\""));
         rules.Add(Span("String", "'", "'"));
         rules.Add(KeywordRule("begin break catch class continue data define do dynamicparam else elseif end exit filter finally for foreach from function if in inline parallel param process return sequence switch throw trap try until using var while workflow true false null"));
@@ -116,7 +162,7 @@ public static class SyntaxHighlightingService
     private static XDocument CreatePython(string name, Palette palette)
     {
         var rules = RuleSet();
-        rules.Add(Span("Comment", "#"));
+        rules.Add(Rule("Comment", @"\#.*$"));
         rules.Add(Span("String", "\"\"\"", "\"\"\"", multiline: true));
         rules.Add(Span("String", "'''", "'''", multiline: true));
         rules.Add(Span("String", "\"", "\""));
@@ -130,7 +176,7 @@ public static class SyntaxHighlightingService
     private static XDocument CreateMarkdown(string name, Palette palette)
     {
         var rules = RuleSet();
-        rules.Add(Rule("Keyword", @"^\s{0,3}#{1,6}\s+.*$"));
+        rules.Add(Rule("Keyword", @"^\s{0,3}\#{1,6}\s+.*$"));
         rules.Add(Rule("Type", @"(?:\*\*(?=\S).+?(?<=\S)\*\*|__(?=\S).+?(?<=\S)__)"));
         rules.Add(Rule("String", @"`[^`]+`"));
         rules.Add(Rule("Comment", @"^\s*>.*$"));
@@ -142,7 +188,7 @@ public static class SyntaxHighlightingService
     private static XDocument CreateSql(string name, Palette palette)
     {
         var rules = RuleSet(ignoreCase: true);
-        rules.Add(Span("Comment", "--"));
+        rules.Add(Rule("Comment", @"--.*$"));
         rules.Add(Span("Comment", @"/\*", @"\*/", multiline: true));
         rules.Add(Span("String", "'", "'"));
         rules.Add(Span("Type", @"\[", @"\]"));
@@ -154,8 +200,7 @@ public static class SyntaxHighlightingService
     private static XDocument CreateIni(string name, Palette palette)
     {
         var rules = RuleSet();
-        rules.Add(Span("Comment", ";"));
-        rules.Add(Span("Comment", "#"));
+        rules.Add(Rule("Comment", @"[;#].*$"));
         rules.Add(Rule("Keyword", @"^\s*\[[^\]]+\]"));
         rules.Add(Rule("Type", @"^[^=;#\r\n]+(?=\s*=)"));
         rules.Add(Span("String", "\"", "\""));

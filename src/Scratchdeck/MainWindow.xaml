@@ -30,7 +30,7 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
-    <Border BorderBrush="{DynamicResource AccentBrush}"
+    <Border BorderBrush="{DynamicResource WindowFrameBrush}"
             BorderThickness="1"
             Background="{DynamicResource WindowBackgroundBrush}"
             SnapsToDevicePixels="True">
@@ -75,6 +75,13 @@
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <ToggleButton x:Name="WrapToggle"
+                                  Width="50" Height="38"
+                                  Style="{StaticResource SecondaryToggleStyle}"
+                                  ToolTip="Wrap long lines inside the editor"
+                                  Checked="WrapToggle_Changed"
+                                  Unchecked="WrapToggle_Changed"
+                                  Content="WRAP" />
                     <ToggleButton x:Name="PinToggle"
                                   Width="44" Height="38"
                                   Style="{StaticResource ToolToggleStyle}"
@@ -101,11 +108,6 @@
             <!-- Tabs -->
             <Grid Grid.Row="1"
                   Background="{DynamicResource SurfaceBrush}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="39" />
-                </Grid.ColumnDefinitions>
-
                 <ListBox x:Name="TabsList"
                          ItemsSource="{Binding Tabs}"
                          SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
@@ -117,6 +119,26 @@
                          PreviewMouseLeftButtonDown="TabsList_PreviewMouseLeftButtonDown"
                          PreviewMouseMove="TabsList_PreviewMouseMove"
                          Drop="TabsList_Drop">
+                    <ListBox.Template>
+                        <ControlTemplate TargetType="ListBox">
+                            <ScrollViewer x:Name="PART_ScrollViewer"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False">
+                                <StackPanel Orientation="Horizontal">
+                                    <ItemsPresenter />
+                                    <Button Width="42" Height="38"
+                                            Style="{StaticResource PlusTabButtonStyle}"
+                                            BorderThickness="0,0,1,1"
+                                            ToolTip="New tab (Ctrl+T)"
+                                            FontSize="20"
+                                            FontWeight="Light"
+                                            Click="NewTabButton_Click"
+                                            Content="+" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </ListBox.Template>
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -195,22 +217,13 @@
                                     <Setter TargetName="TabChrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
                                     <Setter TargetName="TabChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="ActiveLine" Property="Background" Value="{DynamicResource AccentBrush}" />
-                                    <Setter TargetName="ActiveCut" Property="Fill" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="ActiveCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
                                     <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextBrush}" />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-
-                <Button Grid.Column="1"
-                        Style="{StaticResource AccentButtonStyle}"
-                        BorderThickness="0,0,0,1"
-                        ToolTip="New tab (Ctrl+T)"
-                        FontSize="20"
-                        FontWeight="Light"
-                        Click="NewTabButton_Click"
-                        Content="+" />
             </Grid>
 
             <!-- Compact per-tab controls -->
@@ -247,7 +260,7 @@
                                   Content="LINES" />
                     <ToggleButton x:Name="ProtectedToggle"
                                   Margin="3,0,0,0"
-                                  Style="{StaticResource ToolToggleStyle}"
+                                  Style="{StaticResource SecondaryToggleStyle}"
                                   ToolTip="Encrypt this tab with Windows DPAPI. Normal tabs are plain text."
                                   Checked="ProtectedToggle_Changed"
                                   Unchecked="ProtectedToggle_Changed"
@@ -380,6 +393,14 @@
                            Foreground="{DynamicResource SubtleTextBrush}"
                            Text="0 CHARS" />
 
+                <TextBlock x:Name="ModeStatus"
+                           Grid.Column="2"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="9"
+                           Foreground="{DynamicResource SecondaryAccentBrush}" />
+
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,11,0" VerticalAlignment="Center">
                     <Ellipse x:Name="SaveIndicator"
                              Width="6" Height="6"
@@ -392,6 +413,15 @@
                                Text="AUTOSAVED" />
                 </StackPanel>
             </Grid>
+
+            <Border Grid.Row="0" Height="1" VerticalAlignment="Bottom"
+                    Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
+            <Border Grid.Row="1" Height="1" VerticalAlignment="Bottom"
+                    Background="{DynamicResource AccentMutedBrush}" IsHitTestVisible="False" />
+            <Border Grid.Row="2" Height="1" VerticalAlignment="Bottom"
+                    Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
+            <Border Grid.Row="4" Height="1" VerticalAlignment="Top"
+                    Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
         </Grid>
     </Border>
 </Window>

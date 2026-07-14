@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         TabsList.SelectedIndex = _state.SelectedTabIndex;
         Topmost = _state.Topmost;
         PinToggle.IsChecked = _state.Topmost;
+        WrapToggle.IsChecked = _state.AutoWrap;
 
         Editor.Options.ConvertTabsToSpaces = true;
         Editor.Options.IndentationSize = 4;
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
         Editor.Options.EnableHyperlinks = false;
         Editor.Options.EnableEmailHyperlinks = false;
         Editor.Options.AllowScrollBelowDocument = true;
+        ApplyWordWrap();
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdateEditorStatus();
 
         _activeTab = _state.Tabs[_state.SelectedTabIndex];
@@ -253,10 +255,49 @@ public partial class MainWindow : Window
 
     private void ApplySyntaxHighlighting()
     {
-        if (_activeTab is not null)
+        if (_activeTab is null)
         {
-            Editor.SyntaxHighlighting = SyntaxHighlightingService.GetDefinition(_activeTab.SyntaxMode);
+            return;
         }
+
+        try
+        {
+            if (SyntaxHighlightingService.TryGetDefinition(
+                    _activeTab.SyntaxMode,
+                    Editor.Text,
+                    out var definition,
+                    out _))
+            {
+                Editor.SyntaxHighlighting = definition;
+                ModeStatus.Text = string.Empty;
+                SyntaxCombo.ToolTip = null;
+                return;
+            }
+        }
+        catch
+        {
+            // The fallback below keeps editing available even if AvalonEdit rejects a definition.
+        }
+
+        try
+        {
+            Editor.SyntaxHighlighting = null;
+        }
+        catch
+        {
+            // Plain text is the final safe state; avoid surfacing a renderer exception.
+        }
+
+        ModeStatus.Text = "HIGHLIGHTING OFF";
+        SyntaxCombo.ToolTip = "Highlighting is unavailable for this content. Editing continues as plain text.";
+    }
+
+    private void ApplyWordWrap()
+    {
+        Editor.WordWrap = _state.AutoWrap;
+        Editor.HorizontalScrollBarVisibility = _state.AutoWrap
+            ? ScrollBarVisibility.Disabled
+            : ScrollBarVisibility.Auto;
     }
 
     private void UpdateEditorTheme()
@@ -641,6 +682,18 @@ public partial class MainWindow : Window
 
         Topmost = PinToggle.IsChecked ?? false;
         _state.Topmost = Topmost;
+        ScheduleAutosave();
+    }
+
+    private void WrapToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoadingEditor)
+        {
+            return;
+        }
+
+        _state.AutoWrap = WrapToggle.IsChecked ?? false;
+        ApplyWordWrap();
         ScheduleAutosave();
     }
 

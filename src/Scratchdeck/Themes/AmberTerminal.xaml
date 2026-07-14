@@ -4,9 +4,11 @@
     <SolidColorBrush x:Key="SurfaceBrush" Color="#151008" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1D160B" />
     <SolidColorBrush x:Key="BorderBrush" Color="#493519" />
+    <SolidColorBrush x:Key="WindowFrameBrush" Color="#FFB21D" Opacity="0.55" />
     <SolidColorBrush x:Key="AccentBrush" Color="#FFB21D" />
     <SolidColorBrush x:Key="AccentMutedBrush" Color="#FFB21D" Opacity="0.14" />
     <SolidColorBrush x:Key="SecondaryAccentBrush" Color="#FF6B2D" />
+    <SolidColorBrush x:Key="SecondaryAccentMutedBrush" Color="#FF6B2D" Opacity="0.13" />
     <SolidColorBrush x:Key="TextBrush" Color="#FFF3D6" />
     <SolidColorBrush x:Key="MutedTextBrush" Color="#B9A47A" />
     <SolidColorBrush x:Key="SubtleTextBrush" Color="#716044" />

@@ -21,6 +21,7 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
             SelectedTabIndex = 1,
             Theme = "Amber Terminal",
             Topmost = true,
+            AutoWrap = false,
             Window = new WindowPlacement
             {
                 Left = 123,
@@ -55,6 +56,7 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal(1, restored.SelectedTabIndex);
         Assert.Equal("Amber Terminal", restored.Theme);
         Assert.True(restored.Topmost);
+        Assert.False(restored.AutoWrap);
         Assert.Equal("dotnet test", restored.Tabs[0].Content);
         Assert.False(restored.Tabs[0].ShowLineNumbers);
         Assert.True(restored.Tabs[1].IsProtected);
@@ -101,6 +103,38 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Single(state.Tabs);
         Assert.Equal("QUICK NOTE", state.Tabs[0].Title);
         Assert.Equal("Cyberpunk", state.Theme);
+        Assert.True(state.AutoWrap);
+    }
+
+    [Fact]
+    public async Task Load_LegacyWorkspaceWithoutAutoWrap_DefaultsToWrappingEnabled()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        Directory.CreateDirectory(paths.DataDirectory);
+        await File.WriteAllTextAsync(paths.WorkspaceFile, """
+            {
+              "schemaVersion": 1,
+              "selectedTabIndex": 0,
+              "topmost": false,
+              "theme": "Cyberpunk",
+              "tabs": [
+                {
+                  "id": "73ab1517-7626-412d-ab78-1a744c9ee345",
+                  "title": "LEGACY",
+                  "content": "kept",
+                  "isProtected": false,
+                  "syntaxMode": "Plain Text",
+                  "showLineNumbers": true
+                }
+              ]
+            }
+            """);
+        var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
+
+        var state = await service.LoadAsync();
+
+        Assert.True(state.AutoWrap);
+        Assert.Equal("kept", state.Tabs[0].Content);
     }
 
     public void Dispose()

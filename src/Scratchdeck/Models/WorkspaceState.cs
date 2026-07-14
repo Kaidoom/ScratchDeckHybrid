@@ -5,13 +5,14 @@ namespace Scratchdeck.Models;
 
 public sealed class WorkspaceState
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public ObservableCollection<TabDocument> Tabs { get; set; } = [];
     public int SelectedTabIndex { get; set; }
     public WindowPlacement Window { get; set; } = new();
     public bool Topmost { get; set; }
+    public bool AutoWrap { get; set; } = true;
     public string Theme { get; set; } = ThemeService.DefaultTheme;
 
     public static WorkspaceState CreateDefault()

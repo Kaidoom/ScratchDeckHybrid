@@ -1,6 +1,6 @@
 # Scratchdeck
 
-Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, and code snippets. It combines a tabbed AvalonEdit workspace with automatic local persistence, optional per-tab DPAPI protection, a custom dark WPF shell, and four live-switching themes.
+Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, and code snippets. It combines a tabbed AvalonEdit workspace with automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and four live-switching themes.
 
 ![Scratchdeck preview](docs/Scratchdeck-preview.png)
 
@@ -42,7 +42,7 @@ The solution is deliberately small:
 - `Services/WorkspacePersistenceService.cs` maps the live model to a disk DTO, encrypts protected content, performs atomic replacement, rotates one backup, and recovers malformed workspaces.
 - `Services/DpapiProtectionService.cs` uses Windows DPAPI with `CurrentUser` scope. Protected text can only be decrypted by the same Windows user profile.
 - `Services/SingleInstanceService.cs` uses a per-session mutex and named pipe. A second launch tells the existing window to restore and activate.
-- `Services/SyntaxHighlightingService.cs` builds lightweight AvalonEdit definitions from the active theme palette.
+- `Services/SyntaxHighlightingService.cs` builds lightweight AvalonEdit definitions from the active theme palette, validates them against loaded content, and falls back to plain text if a definition is unsafe.
 - `Themes/` centralizes all interface and syntax colours in WPF resource dictionaries.
 - `MainWindow.xaml` and its focused code-behind own the view interactions: tabs, drag reordering, inline rename, search, window chrome, and the 400 ms autosave debounce.
 
@@ -71,10 +71,10 @@ Important: normal tabs are stored as plain text in `workspace.json`. Turn on **L
 | `Ctrl+Shift+P` | Toggle always-on-top |
 | `Ctrl+Z`, `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands |
 
-Double-click a tab title to rename it. Drag a tab to reorder it. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
+Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
 
 ## Themes and syntax modes
 
-The built-in themes are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark. Theme changes apply immediately to chrome, controls, editor selection, syntax colours, focus states, and status indicators.
+The built-in themes are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark. Cyberpunk uses cyan for primary active states and restrained amber for secondary controls, status, and emphasis. Theme changes apply immediately to chrome, controls, editor selection, syntax colours, focus states, scrollbars, and status indicators.
 
-Each tab can use Plain Text, C++, C#, JSON, XML, PowerShell, Python, JavaScript, Markdown, SQL, Go, or INI highlighting. Text remains plain and is preserved exactly as entered.
+Each tab can use Plain Text, C++, C#, JSON, XML, HTML, PowerShell, Python, JavaScript, Markdown, SQL, Go, or INI highlighting. Text remains plain and is preserved exactly as entered. Unexpected mixed content is validated before a highlighter is activated, so a problematic definition degrades to stable plain-text editing rather than taking down the window.
