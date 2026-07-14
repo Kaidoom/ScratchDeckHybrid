@@ -19,6 +19,8 @@ public sealed class ThemeServiceTests : IDisposable
         await service.LoadAsync();
 
         Assert.True(File.Exists(paths.ThemesFile));
+        var json = await File.ReadAllTextAsync(paths.ThemesFile);
+        Assert.Contains($"\"schemaVersion\": {ThemeCatalog.CurrentSchemaVersion}", json, StringComparison.Ordinal);
         Assert.Contains(service.AppThemes, theme =>
             theme.Id == ThemeService.DefaultAppThemeId && theme.Title == "Cyberpunk");
         Assert.Contains(service.CodeThemes, theme =>
@@ -32,26 +34,33 @@ public sealed class ThemeServiceTests : IDisposable
         var service = new ThemeService(paths);
         await service.LoadAsync();
 
-        var appTheme = await service.UpsertAppThemeAsync(new AppThemeDefinition
-        {
-            Title = "Slate Glow",
-            Colors = new AppThemeColors
+        var saved = await service.UpsertThemesAsync(
+            new AppThemeDefinition
             {
-                Background = "#16191F",
-                OuterEdgeTop = "#32D7FF",
-                OuterEdgeBottom = "#FFBA43"
-            }
-        });
-        var codeTheme = await service.UpsertCodeThemeAsync(new CodeThemeDefinition
-        {
-            Title = "Soft Contrast",
-            Colors = new CodeThemeColors
+                Title = "Slate Glow",
+                FontFamily = "Tahoma",
+                FontSize = 12.5,
+                Colors = new AppThemeColors
+                {
+                    Background = "#16191F",
+                    OuterEdgeTop = "#32D7FF",
+                    OuterEdgeBottom = "#FFBA43"
+                }
+            },
+            new CodeThemeDefinition
             {
-                Background = "#202226",
-                Foreground = "#E8E9EA",
-                Keyword = "#FFBA43"
-            }
-        });
+                Title = "Soft Contrast",
+                FontFamily = "Consolas",
+                FontSize = 15,
+                Colors = new CodeThemeColors
+                {
+                    Background = "#202226",
+                    Foreground = "#E8E9EA",
+                    Keyword = "#FFBA43"
+                }
+            });
+        var appTheme = saved.AppTheme;
+        var codeTheme = saved.CodeTheme;
 
         var reloaded = new ThemeService(paths);
         await reloaded.LoadAsync();
@@ -60,8 +69,12 @@ public sealed class ThemeServiceTests : IDisposable
         Assert.Equal("soft-contrast", codeTheme.Id);
         Assert.Equal("#16191F", reloaded.FindAppTheme(appTheme.Id)!.Colors.Background);
         Assert.Equal("#FFBA43", reloaded.FindAppTheme(appTheme.Id)!.Colors.OuterEdgeBottom);
+        Assert.Equal("Tahoma", reloaded.FindAppTheme(appTheme.Id)!.FontFamily);
+        Assert.Equal(12.5, reloaded.FindAppTheme(appTheme.Id)!.FontSize);
         Assert.Equal("#202226", reloaded.FindCodeTheme(codeTheme.Id)!.Colors.Background);
         Assert.Equal("#FFBA43", reloaded.FindCodeTheme(codeTheme.Id)!.Colors.Keyword);
+        Assert.Equal("Consolas", reloaded.FindCodeTheme(codeTheme.Id)!.FontFamily);
+        Assert.Equal(15, reloaded.FindCodeTheme(codeTheme.Id)!.FontSize);
     }
 
     [Fact]
@@ -103,6 +116,8 @@ public sealed class ThemeServiceTests : IDisposable
                 {
                   "id": "custom",
                   "title": "Custom",
+                  "fontFamily": " ",
+                  "fontSize": 99,
                   "colors": {
                     "background": "not-a-color",
                     "outerEdgeTop": "#123456",
@@ -121,6 +136,8 @@ public sealed class ThemeServiceTests : IDisposable
         Assert.NotNull(custom);
         Assert.Equal("#060910", custom.Colors.Background);
         Assert.Equal("#123456", custom.Colors.OuterEdgeTop);
+        Assert.Equal("Segoe UI Variable Text, Segoe UI", custom.FontFamily);
+        Assert.Equal(11, custom.FontSize);
         Assert.Equal(ThemeService.DefaultCodeThemeId, service.CodeThemes[0].Id);
     }
 
@@ -133,6 +150,22 @@ public sealed class ThemeServiceTests : IDisposable
     public void IsValidColor_AcceptsOnlySupportedHexFormats(string value, bool expected)
     {
         Assert.Equal(expected, ThemeService.IsValidColor(value));
+    }
+
+    [Theory]
+    [InlineData(7.9, false, false)]
+    [InlineData(8, true, true)]
+    [InlineData(16, true, true)]
+    [InlineData(16.1, false, true)]
+    [InlineData(32, false, true)]
+    [InlineData(32.1, false, false)]
+    public void FontSizeValidation_UsesSeparateAppAndCodeRanges(
+        double value,
+        bool validApp,
+        bool validCode)
+    {
+        Assert.Equal(validApp, ThemeService.IsValidAppFontSize(value));
+        Assert.Equal(validCode, ThemeService.IsValidCodeFontSize(value));
     }
 
     public void Dispose()

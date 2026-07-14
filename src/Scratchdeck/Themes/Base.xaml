@@ -4,10 +4,12 @@
                     xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework">
 
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
-    <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+    <FontFamily x:Key="CodeFont">Cascadia Mono, Consolas</FontFamily>
+    <sys:Double x:Key="AppFontSize">11</sys:Double>
+    <sys:Double x:Key="CodeFontSize">13.5</sys:Double>
 
     <Style TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
     </Style>
 
@@ -17,8 +19,8 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="7,4" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
     </Style>
 
     <Style TargetType="ContextMenu">
@@ -46,8 +48,8 @@
     <Style TargetType="MenuItem">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="Padding" Value="9,6" />
         <Setter Property="MinWidth" Value="170" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -69,8 +71,8 @@
                             <TextBlock Grid.Column="1"
                                        Margin="18,0,0,0"
                                        VerticalAlignment="Center"
-                                       FontFamily="{StaticResource MonoFont}"
-                                       FontSize="9"
+                                       FontFamily="{DynamicResource UiFont}"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        Foreground="{DynamicResource SubtleTextBrush}"
                                        Text="{TemplateBinding InputGestureText}" />
                         </Grid>
@@ -108,8 +110,8 @@
         <Setter Property="Padding" Value="9,4" />
         <Setter Property="MinWidth" Value="28" />
         <Setter Property="MinHeight" Value="27" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
@@ -204,8 +206,8 @@
         <Setter Property="Padding" Value="9,4" />
         <Setter Property="MinWidth" Value="34" />
         <Setter Property="Height" Value="27" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
@@ -246,8 +248,8 @@
         <Setter Property="Padding" Value="9,4" />
         <Setter Property="MinWidth" Value="34" />
         <Setter Property="Height" Value="27" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
@@ -288,8 +290,8 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="7,4" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Style.Triggers>
             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -363,8 +365,8 @@
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
         <Setter Property="Height" Value="26" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />

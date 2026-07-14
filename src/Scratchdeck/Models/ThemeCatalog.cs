@@ -2,7 +2,7 @@ namespace Scratchdeck.Models;
 
 public sealed class ThemeCatalog
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public List<AppThemeDefinition> AppThemes { get; set; } = [];
@@ -13,12 +13,16 @@ public sealed class AppThemeDefinition
 {
     public string Id { get; set; } = string.Empty;
     public string Title { get; set; } = "Untitled App Theme";
+    public string FontFamily { get; set; } = "Segoe UI Variable Text, Segoe UI";
+    public double FontSize { get; set; } = 11;
     public AppThemeColors Colors { get; set; } = new();
 
     public AppThemeDefinition Clone() => new()
     {
         Id = Id,
         Title = Title,
+        FontFamily = FontFamily,
+        FontSize = FontSize,
         Colors = Colors.Clone()
     };
 
@@ -29,12 +33,16 @@ public sealed class CodeThemeDefinition
 {
     public string Id { get; set; } = string.Empty;
     public string Title { get; set; } = "Untitled Code Theme";
+    public string FontFamily { get; set; } = "Cascadia Mono, Consolas";
+    public double FontSize { get; set; } = 13.5;
     public CodeThemeColors Colors { get; set; } = new();
 
     public CodeThemeDefinition Clone() => new()
     {
         Id = Id,
         Title = Title,
+        FontFamily = FontFamily,
+        FontSize = FontSize,
         Colors = Colors.Clone()
     };
 

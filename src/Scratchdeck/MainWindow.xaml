@@ -13,6 +13,8 @@
         ResizeMode="CanResize"
         AllowsTransparency="False"
         WindowStartupLocation="Manual"
+        FontFamily="{DynamicResource UiFont}"
+        FontSize="{DynamicResource AppFontSize}"
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
         SourceInitialized="Window_SourceInitialized"
@@ -39,7 +41,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center"
-                           FontSize="10"
+                           FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource MutedTextBrush}"
                            Text="{Binding Label}" />
                 <Border x:Name="Swatch"
@@ -52,7 +54,7 @@
                          Grid.Column="2"
                          Height="25"
                          Padding="6,2"
-                         FontFamily="{StaticResource MonoFont}"
+                         FontFamily="{DynamicResource UiFont}"
                          Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
             </Grid>
             <DataTemplate.Triggers>
@@ -96,13 +98,13 @@
                     </Border>
                     <TextBlock Margin="9,0,0,0"
                                VerticalAlignment="Center"
-                               FontSize="13"
+                               FontSize="{DynamicResource AppFontSize}"
                                FontWeight="SemiBold"
                                Text="SCRATCHDECK" />
                     <Border Width="1" Height="13" Margin="10,0"
                             Background="{DynamicResource BorderBrush}" />
                     <TextBlock VerticalAlignment="Center"
-                               FontSize="9"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="RAPID CAPTURE / LOCAL" />
                 </StackPanel>
@@ -213,10 +215,10 @@
                                           Data="M1,4 L1,9 L7,9 L7,4 Z M2,4 L2,2 C2,0.7 3,0 4,0 C5,0 6,0.7 6,2 L6,4 L5,4 L5,2 C5,1.4 4.6,1 4,1 C3.4,1 3,1.4 3,2 L3,4 Z" />
 
                                     <Grid Grid.Column="1" Margin="3,0,3,0">
-                                        <TextBlock x:Name="TabTitle"
+                                            <TextBlock x:Name="TabTitle"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
-                                                   FontSize="11"
+                                                   FontSize="{DynamicResource AppFontSize}"
                                                    Foreground="{DynamicResource MutedTextBrush}"
                                                    Text="{Binding Title}" />
                                         <TextBox x:Name="RenameTextBox"
@@ -274,7 +276,7 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
                     <TextBlock VerticalAlignment="Center"
                                Margin="0,0,7,0"
-                               FontSize="9"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="MODE" />
                     <ComboBox x:Name="SyntaxCombo"
@@ -304,7 +306,7 @@
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,9,0" VerticalAlignment="Center">
                     <TextBlock VerticalAlignment="Center"
                                Margin="0,0,7,0"
-                               FontSize="9"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="APP" />
                     <ComboBox x:Name="AppThemeCombo"
@@ -313,7 +315,7 @@
                               SelectionChanged="AppThemeCombo_SelectionChanged" />
                     <TextBlock VerticalAlignment="Center"
                                Margin="8,0,7,0"
-                               FontSize="9"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="CODE" />
                     <ComboBox x:Name="CodeThemeCombo"
@@ -336,8 +338,8 @@
                                        Background="{DynamicResource EditorBackgroundBrush}"
                                        Foreground="{DynamicResource EditorForegroundBrush}"
                                        LineNumbersForeground="{DynamicResource EditorLineNumberBrush}"
-                                       FontFamily="{StaticResource MonoFont}"
-                                       FontSize="13.5"
+                                       FontFamily="{DynamicResource CodeFont}"
+                                       FontSize="{DynamicResource CodeFontSize}"
                                        Padding="8,7"
                                        ShowLineNumbers="True"
                                        WordWrap="False"
@@ -388,13 +390,13 @@
                           Data="M16,0 L2,17 L11,17 L7,31 L24,12 L15,12 Z" />
                     <TextBlock Margin="0,14,0,0"
                                HorizontalAlignment="Center"
-                               FontFamily="{StaticResource MonoFont}"
-                               FontSize="11"
+                               FontFamily="{DynamicResource UiFont}"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Text="PASTE. TYPE. RETRIEVE." />
                     <TextBlock Margin="0,4,0,0"
                                HorizontalAlignment="Center"
-                               FontSize="9"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource SubtleTextBrush}"
                                Text="YOUR WORKSPACE SAVES ITSELF" />
                 </StackPanel>
@@ -419,7 +421,7 @@
                         <TextBox x:Name="SearchBox"
                                  Height="33"
                                  BorderThickness="0"
-                                 FontFamily="{StaticResource MonoFont}"
+                                 FontFamily="{DynamicResource UiFont}"
                                  VerticalContentAlignment="Center"
                                  TextChanged="SearchBox_TextChanged"
                                  KeyDown="SearchBox_KeyDown" />
@@ -427,7 +429,7 @@
                                    Grid.Column="1"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center"
-                                   FontSize="8"
+                                   FontSize="{DynamicResource AppFontSize}"
                                    Foreground="{DynamicResource SecondaryAccentBrush}" />
                         <Button Grid.Column="2" Padding="0"
                                 Style="{StaticResource ToolButtonStyle}"
@@ -460,16 +462,16 @@
                 <TextBlock x:Name="CursorStatus"
                            Margin="11,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{StaticResource MonoFont}"
-                           FontSize="9"
+                           FontFamily="{DynamicResource UiFont}"
+                           FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource MutedTextBrush}"
                            Text="LN 1  COL 1" />
                 <TextBlock x:Name="CharacterStatus"
                            Grid.Column="1"
                            Margin="16,0,0,0"
                            VerticalAlignment="Center"
-                           FontFamily="{StaticResource MonoFont}"
-                           FontSize="9"
+                           FontFamily="{DynamicResource UiFont}"
+                           FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource SubtleTextBrush}"
                            Text="0 CHARS" />
 
@@ -477,8 +479,8 @@
                            Grid.Column="2"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           FontFamily="{StaticResource MonoFont}"
-                           FontSize="9"
+                           FontFamily="{DynamicResource UiFont}"
+                           FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource SecondaryAccentBrush}" />
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,11,0" VerticalAlignment="Center">
@@ -487,8 +489,8 @@
                              Margin="0,0,6,0"
                              Fill="{DynamicResource SuccessBrush}" />
                     <TextBlock x:Name="SaveStatus"
-                               FontFamily="{StaticResource MonoFont}"
-                               FontSize="9"
+                               FontFamily="{DynamicResource UiFont}"
+                               FontSize="{DynamicResource AppFontSize}"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Text="AUTOSAVED" />
                 </StackPanel>
@@ -516,7 +518,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="44" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="34" />
+                        <RowDefinition Height="50" />
                     </Grid.RowDefinitions>
 
                     <Grid Background="{DynamicResource SurfaceRaisedBrush}">
@@ -525,15 +527,16 @@
                             <ColumnDefinition Width="42" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
-                            <TextBlock FontSize="13" FontWeight="SemiBold" Text="THEME PANEL" />
+                            <TextBlock FontSize="{DynamicResource AppFontSize}" FontWeight="SemiBold" Text="THEME PANEL" />
                             <TextBlock Margin="9,0,0,0"
                                        VerticalAlignment="Center"
-                                       FontSize="9"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        Foreground="{DynamicResource SecondaryAccentBrush}"
                                        Text="APP + CODE" />
                         </StackPanel>
                         <Button Grid.Column="1"
                                 Style="{StaticResource WindowButtonStyle}"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="Close theme panel"
                                 Click="CloseThemePanelButton_Click"
                                 Content="×" />
@@ -543,12 +546,12 @@
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="14,12,16,16">
-                            <TextBlock FontSize="10"
+                            <TextBlock FontSize="{DynamicResource AppFontSize}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AccentBrush}"
                                        Text="APP THEME / CHROME" />
                             <TextBlock Margin="0,4,0,10"
-                                       FontSize="9"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource SubtleTextBrush}"
                                        Text="Controls surfaces, accents, text, and the top-to-bottom outer-edge gradient." />
@@ -570,28 +573,56 @@
                                         Content="NEW" />
                             </Grid>
                             <TextBlock Margin="0,10,0,4"
-                                       FontSize="9"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        Foreground="{DynamicResource SubtleTextBrush}"
                                        Text="TITLE" />
                             <TextBox x:Name="AppThemeTitleBox" />
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="128" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Font family" />
+                                <TextBox x:Name="AppThemeFontFamilyBox"
+                                         Grid.Column="1" Grid.ColumnSpan="2"
+                                         Height="25" Padding="6,2" />
+                                <TextBlock Grid.Row="1"
+                                           Margin="0,6,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Font size" />
+                                <TextBox x:Name="AppThemeFontSizeBox"
+                                         Grid.Row="1" Grid.Column="1"
+                                         Width="72" Height="25"
+                                         Margin="0,6,0,0"
+                                         HorizontalAlignment="Left"
+                                         Padding="6,2" />
+                                <TextBlock Grid.Row="1" Grid.Column="2"
+                                           Margin="8,6,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SubtleTextBrush}"
+                                           Text="8–16 pt" />
+                            </Grid>
                             <ItemsControl x:Name="AppThemeFieldsList"
                                           Margin="0,7,0,0"
                                           ItemTemplate="{StaticResource ThemeColorFieldTemplate}" />
-                            <Button Margin="0,10,0,0"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource AccentButtonStyle}"
-                                    Click="SaveAppThemeButton_Click"
-                                    Content="SAVE APP THEME" />
 
                             <Border Height="1" Margin="0,18,0,16"
                                     Background="{DynamicResource BorderBrush}" />
 
-                            <TextBlock FontSize="10"
+                            <TextBlock FontSize="{DynamicResource AppFontSize}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource SecondaryAccentBrush}"
                                        Text="CODE THEME / EDITOR" />
                             <TextBlock Margin="0,4,0,10"
-                                       FontSize="9"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource SubtleTextBrush}"
                                        Text="Controls editor background, foreground, selection, caret, line numbers, and syntax colors." />
@@ -613,43 +644,81 @@
                                         Content="NEW" />
                             </Grid>
                             <TextBlock Margin="0,10,0,4"
-                                       FontSize="9"
+                                       FontSize="{DynamicResource AppFontSize}"
                                        Foreground="{DynamicResource SubtleTextBrush}"
                                        Text="TITLE" />
                             <TextBox x:Name="CodeThemeTitleBox" />
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="128" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Font family" />
+                                <TextBox x:Name="CodeThemeFontFamilyBox"
+                                         Grid.Column="1" Grid.ColumnSpan="2"
+                                         Height="25" Padding="6,2" />
+                                <TextBlock Grid.Row="1"
+                                           Margin="0,6,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Font size" />
+                                <TextBox x:Name="CodeThemeFontSizeBox"
+                                         Grid.Row="1" Grid.Column="1"
+                                         Width="72" Height="25"
+                                         Margin="0,6,0,0"
+                                         HorizontalAlignment="Left"
+                                         Padding="6,2" />
+                                <TextBlock Grid.Row="1" Grid.Column="2"
+                                           Margin="8,6,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SubtleTextBrush}"
+                                           Text="8–32 pt" />
+                            </Grid>
                             <ItemsControl x:Name="CodeThemeFieldsList"
                                           Margin="0,7,0,0"
                                           ItemTemplate="{StaticResource ThemeColorFieldTemplate}" />
-                            <Button Margin="0,10,0,0"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource PlusTabButtonStyle}"
-                                    Padding="10,5"
-                                    Click="SaveCodeThemeButton_Click"
-                                    Content="SAVE CODE THEME" />
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Grid Grid.Row="2" Background="{DynamicResource SurfaceRaisedBrush}">
+                    <Grid Grid.Row="2"
+                          Background="{DynamicResource SurfaceRaisedBrush}"
+                          shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="76" />
+                            <ColumnDefinition Width="76" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ThemeEditorStatus"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"
-                                   FontFamily="{StaticResource MonoFont}"
-                                   FontSize="9"
-                                   Foreground="{DynamicResource MutedTextBrush}"
-                                   Text="READY" />
-                        <TextBlock x:Name="ThemeFileStatus"
-                                   Grid.Column="1"
-                                   MaxWidth="170"
-                                   Margin="8,0,12,0"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   FontSize="8"
-                                   Foreground="{DynamicResource SubtleTextBrush}"
-                                   Text="themes.json" />
+                        <StackPanel Margin="12,0,6,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ThemeEditorStatus"
+                                       FontFamily="{DynamicResource UiFont}"
+                                       Foreground="{DynamicResource MutedTextBrush}"
+                                       Text="READY" />
+                            <TextBlock x:Name="ThemeFileStatus"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource SubtleTextBrush}"
+                                       Text="themes.json" />
+                        </StackPanel>
+                        <Button x:Name="ThemeCancelButton"
+                                Grid.Column="1"
+                                Margin="0,8,5,8"
+                                Style="{StaticResource ToolButtonStyle}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                Click="CancelThemePanelButton_Click"
+                                Content="CANCEL" />
+                        <Button x:Name="ThemeSaveButton"
+                                Grid.Column="2"
+                                Margin="0,8,8,8"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="SaveThemePanelButton_Click"
+                                Content="SAVE" />
                     </Grid>
                 </Grid>
             </Border>

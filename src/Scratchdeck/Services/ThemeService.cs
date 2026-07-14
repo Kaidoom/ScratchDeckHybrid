@@ -10,6 +10,10 @@ public sealed class ThemeService
 {
     public const string DefaultAppThemeId = "cyberpunk";
     public const string DefaultCodeThemeId = "cyberpunk-code";
+    public const double MinAppFontSize = 8;
+    public const double MaxAppFontSize = 16;
+    public const double MinCodeFontSize = 8;
+    public const double MaxCodeFontSize = 32;
 
     private readonly WorkspacePaths _paths;
     private readonly SemaphoreSlim _saveLock = new(1, 1);
@@ -98,6 +102,8 @@ public sealed class ThemeService
         var colors = theme.Colors;
         var dictionary = new ResourceDictionary
         {
+            ["UiFont"] = Font(theme.FontFamily, "Segoe UI Variable Text, Segoe UI"),
+            ["AppFontSize"] = theme.FontSize,
             ["WindowBackgroundBrush"] = Solid(colors.Background),
             ["SurfaceBrush"] = Solid(colors.Surface),
             ["SurfaceRaisedBrush"] = Solid(colors.RaisedSurface),
@@ -133,6 +139,8 @@ public sealed class ThemeService
         var colors = theme.Colors;
         var dictionary = new ResourceDictionary
         {
+            ["CodeFont"] = Font(theme.FontFamily, "Cascadia Mono, Consolas"),
+            ["CodeFontSize"] = theme.FontSize,
             ["EditorBackgroundBrush"] = Solid(colors.Background),
             ["EditorForegroundBrush"] = Solid(colors.Foreground),
             ["SelectionBrush"] = Solid(colors.Selection),
@@ -153,7 +161,7 @@ public sealed class ThemeService
         AppThemeDefinition theme,
         CancellationToken cancellationToken = default)
     {
-        Validate(theme.Title, theme.Colors);
+        Validate(theme);
         var clone = theme.Clone();
         clone.Id = string.IsNullOrWhiteSpace(clone.Id)
             ? CreateUniqueId(clone.Title, AppThemes.Select(item => item.Id), "app-theme")
@@ -193,7 +201,7 @@ public sealed class ThemeService
         CodeThemeDefinition theme,
         CancellationToken cancellationToken = default)
     {
-        Validate(theme.Title, theme.Colors);
+        Validate(theme);
         var clone = theme.Clone();
         clone.Id = string.IsNullOrWhiteSpace(clone.Id)
             ? CreateUniqueId(clone.Title, CodeThemes.Select(item => item.Id), "code-theme")
@@ -227,6 +235,75 @@ public sealed class ThemeService
             throw;
         }
         return clone;
+    }
+
+    public async Task<(AppThemeDefinition AppTheme, CodeThemeDefinition CodeTheme)> UpsertThemesAsync(
+        AppThemeDefinition appTheme,
+        CodeThemeDefinition codeTheme,
+        CancellationToken cancellationToken = default)
+    {
+        Validate(appTheme);
+        Validate(codeTheme);
+
+        var appClone = appTheme.Clone();
+        appClone.Id = string.IsNullOrWhiteSpace(appClone.Id)
+            ? CreateUniqueId(appClone.Title, AppThemes.Select(item => item.Id), "app-theme")
+            : appClone.Id.Trim();
+        var codeClone = codeTheme.Clone();
+        codeClone.Id = string.IsNullOrWhiteSpace(codeClone.Id)
+            ? CreateUniqueId(codeClone.Title, CodeThemes.Select(item => item.Id), "code-theme")
+            : codeClone.Id.Trim();
+
+        var appIndex = Catalog.AppThemes.FindIndex(item =>
+            item.Id.Equals(appClone.Id, StringComparison.OrdinalIgnoreCase));
+        var codeIndex = Catalog.CodeThemes.FindIndex(item =>
+            item.Id.Equals(codeClone.Id, StringComparison.OrdinalIgnoreCase));
+        var previousApp = appIndex >= 0 ? Catalog.AppThemes[appIndex] : null;
+        var previousCode = codeIndex >= 0 ? Catalog.CodeThemes[codeIndex] : null;
+
+        if (appIndex >= 0)
+        {
+            Catalog.AppThemes[appIndex] = appClone;
+        }
+        else
+        {
+            Catalog.AppThemes.Add(appClone);
+        }
+        if (codeIndex >= 0)
+        {
+            Catalog.CodeThemes[codeIndex] = codeClone;
+        }
+        else
+        {
+            Catalog.CodeThemes.Add(codeClone);
+        }
+
+        try
+        {
+            await SaveCatalogAsync(cancellationToken);
+        }
+        catch
+        {
+            if (appIndex >= 0 && previousApp is not null)
+            {
+                Catalog.AppThemes[appIndex] = previousApp;
+            }
+            else
+            {
+                Catalog.AppThemes.Remove(appClone);
+            }
+            if (codeIndex >= 0 && previousCode is not null)
+            {
+                Catalog.CodeThemes[codeIndex] = previousCode;
+            }
+            else
+            {
+                Catalog.CodeThemes.Remove(codeClone);
+            }
+            throw;
+        }
+
+        return (appClone, codeClone);
     }
 
     public async Task SaveCatalogAsync(CancellationToken cancellationToken = default)
@@ -294,6 +371,17 @@ public sealed class ThemeService
         }
     }
 
+    public static bool IsValidFontFamily(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        value.Trim().Length <= 200 &&
+        value.All(character => !char.IsControl(character));
+
+    public static bool IsValidAppFontSize(double value) =>
+        double.IsFinite(value) && value >= MinAppFontSize && value <= MaxAppFontSize;
+
+    public static bool IsValidCodeFontSize(double value) =>
+        double.IsFinite(value) && value >= MinCodeFontSize && value <= MaxCodeFontSize;
+
     private async Task<ThemeCatalog?> TryLoadCatalogAsync(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
@@ -356,6 +444,8 @@ public sealed class ThemeService
     {
         theme.Id = string.IsNullOrWhiteSpace(theme.Id) ? Guid.NewGuid().ToString("N") : theme.Id.Trim();
         theme.Title = string.IsNullOrWhiteSpace(theme.Title) ? "Untitled App Theme" : theme.Title.Trim();
+        theme.FontFamily = IsValidFontFamily(theme.FontFamily) ? theme.FontFamily.Trim() : fallback.FontFamily;
+        theme.FontSize = IsValidAppFontSize(theme.FontSize) ? theme.FontSize : fallback.FontSize;
         theme.Colors ??= fallback.Colors.Clone();
         var colors = theme.Colors;
         var source = fallback.Colors;
@@ -379,6 +469,8 @@ public sealed class ThemeService
     {
         theme.Id = string.IsNullOrWhiteSpace(theme.Id) ? Guid.NewGuid().ToString("N") : theme.Id.Trim();
         theme.Title = string.IsNullOrWhiteSpace(theme.Title) ? "Untitled Code Theme" : theme.Title.Trim();
+        theme.FontFamily = IsValidFontFamily(theme.FontFamily) ? theme.FontFamily.Trim() : fallback.FontFamily;
+        theme.FontSize = IsValidCodeFontSize(theme.FontSize) ? theme.FontSize : fallback.FontSize;
         theme.Colors ??= fallback.Colors.Clone();
         var colors = theme.Colors;
         var source = fallback.Colors;
@@ -397,31 +489,51 @@ public sealed class ThemeService
 
     private static string ValidOr(string? value, string fallback) => IsValidColor(value) ? value! : fallback;
 
-    private static void Validate(string title, AppThemeColors colors)
+    private static void Validate(AppThemeDefinition theme)
     {
-        if (string.IsNullOrWhiteSpace(title))
+        if (string.IsNullOrWhiteSpace(theme.Title))
         {
-            throw new ArgumentException("Theme title is required.", nameof(title));
+            throw new ArgumentException("Theme title is required.", nameof(theme));
+        }
+        if (!IsValidFontFamily(theme.FontFamily))
+        {
+            throw new ArgumentException("App font family is required and cannot contain control characters.", nameof(theme));
+        }
+        if (!IsValidAppFontSize(theme.FontSize))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(theme),
+                $"App font size must be between {MinAppFontSize:0.#} and {MaxAppFontSize:0.#}.");
         }
 
         ValidateColors(
-            colors.Background, colors.Surface, colors.RaisedSurface, colors.Border,
-            colors.OuterEdgeTop, colors.OuterEdgeBottom, colors.PrimaryAccent,
-            colors.SecondaryAccent, colors.Text, colors.MutedText, colors.SubtleText,
-            colors.Danger, colors.Success);
+            theme.Colors.Background, theme.Colors.Surface, theme.Colors.RaisedSurface, theme.Colors.Border,
+            theme.Colors.OuterEdgeTop, theme.Colors.OuterEdgeBottom, theme.Colors.PrimaryAccent,
+            theme.Colors.SecondaryAccent, theme.Colors.Text, theme.Colors.MutedText, theme.Colors.SubtleText,
+            theme.Colors.Danger, theme.Colors.Success);
     }
 
-    private static void Validate(string title, CodeThemeColors colors)
+    private static void Validate(CodeThemeDefinition theme)
     {
-        if (string.IsNullOrWhiteSpace(title))
+        if (string.IsNullOrWhiteSpace(theme.Title))
         {
-            throw new ArgumentException("Theme title is required.", nameof(title));
+            throw new ArgumentException("Theme title is required.", nameof(theme));
+        }
+        if (!IsValidFontFamily(theme.FontFamily))
+        {
+            throw new ArgumentException("Code font family is required and cannot contain control characters.", nameof(theme));
+        }
+        if (!IsValidCodeFontSize(theme.FontSize))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(theme),
+                $"Code font size must be between {MinCodeFontSize:0.#} and {MaxCodeFontSize:0.#}.");
         }
 
         ValidateColors(
-            colors.Background, colors.Foreground, colors.Selection, colors.Keyword,
-            colors.Type, colors.String, colors.Number, colors.Comment,
-            colors.LineNumber, colors.Caret);
+            theme.Colors.Background, theme.Colors.Foreground, theme.Colors.Selection, theme.Colors.Keyword,
+            theme.Colors.Type, theme.Colors.String, theme.Colors.Number, theme.Colors.Comment,
+            theme.Colors.LineNumber, theme.Colors.Caret);
     }
 
     private static void ValidateColors(params string[] colors)
@@ -455,6 +567,18 @@ public sealed class ThemeService
             candidate = $"{slug}-{suffix++}";
         }
         return candidate;
+    }
+
+    private static FontFamily Font(string value, string fallback)
+    {
+        try
+        {
+            return new FontFamily(IsValidFontFamily(value) ? value.Trim() : fallback);
+        }
+        catch
+        {
+            return new FontFamily(fallback);
+        }
     }
 
     private static SolidColorBrush Solid(string value, double opacity = 1)

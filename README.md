@@ -78,7 +78,9 @@ Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** be
 
 The **APP** selector controls window chrome, surfaces, labels, controls, status colors, and the top-to-bottom outer-edge gradient. The **CODE** selector independently controls the editor background, foreground, selection, caret, line numbers, and syntax colors. The built-in choices are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark.
 
-Use **EDIT** to open the theme panel. Existing themes can be customized in place, while **NEW** starts a copy of the active theme under a new title. Color values accept `#RRGGBB` or `#AARRGGBB`; invalid values are marked before saving.
+Use **EDIT** to open the theme panel. Existing themes can be customized in place, while **NEW** starts a copy of the active theme under a new title. App and code themes each have an independent font family and size. App font sizes accept 8–16 pt and code font sizes accept 8–32 pt.
+
+The fixed footer keeps **Save** and **Cancel** available while the color lists scroll. Save validates and writes both edited theme halves in one catalog operation, then applies them together. Cancel, Escape, the panel ×, and clicking the shaded area discard unsaved editor changes. Color values accept `#RRGGBB` or `#AARRGGBB`; invalid values are marked before saving.
 
 Themes are loaded at startup from:
 
@@ -90,11 +92,13 @@ The catalog keeps app and code definitions separate. A shortened example is:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "appThemes": [
     {
       "id": "cyberpunk",
       "title": "Cyberpunk",
+      "fontFamily": "Segoe UI Variable Text, Segoe UI",
+      "fontSize": 11,
       "colors": {
         "background": "#060910",
         "surface": "#0A1019",
@@ -109,6 +113,8 @@ The catalog keeps app and code definitions separate. A shortened example is:
     {
       "id": "cyberpunk-code",
       "title": "Cyberpunk",
+      "fontFamily": "Cascadia Mono, Consolas",
+      "fontSize": 13.5,
       "colors": {
         "background": "#070C14",
         "foreground": "#E4EBF0",

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -765,6 +766,8 @@ public partial class MainWindow : Window
     {
         _editingAppThemeId = theme.Id;
         AppThemeTitleBox.Text = theme.Title;
+        AppThemeFontFamilyBox.Text = theme.FontFamily;
+        AppThemeFontSizeBox.Text = theme.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
         _appThemeFields = CreateAppThemeFields(theme.Colors);
         AppThemeFieldsList.ItemsSource = _appThemeFields;
     }
@@ -773,6 +776,8 @@ public partial class MainWindow : Window
     {
         _editingCodeThemeId = theme.Id;
         CodeThemeTitleBox.Text = theme.Title;
+        CodeThemeFontFamilyBox.Text = theme.FontFamily;
+        CodeThemeFontSizeBox.Text = theme.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
         _codeThemeFields = CreateCodeThemeFields(theme.Colors);
         CodeThemeFieldsList.ItemsSource = _codeThemeFields;
     }
@@ -786,6 +791,8 @@ public partial class MainWindow : Window
     }
 
     private void CloseThemePanelButton_Click(object sender, RoutedEventArgs e) => CloseThemePanel();
+
+    private void CancelThemePanelButton_Click(object sender, RoutedEventArgs e) => CloseThemePanel();
 
     private void ThemePanelScrim_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => CloseThemePanel();
 
@@ -804,6 +811,8 @@ public partial class MainWindow : Window
         AppThemeEditorCombo.SelectedIndex = -1;
         _isLoadingThemes = false;
         AppThemeTitleBox.Text = $"{source.Title} Custom";
+        AppThemeFontFamilyBox.Text = source.FontFamily;
+        AppThemeFontSizeBox.Text = source.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
         _appThemeFields = CreateAppThemeFields(source.Colors);
         AppThemeFieldsList.ItemsSource = _appThemeFields;
         SetThemeEditorStatus("NEW APP THEME", "AccentBrush");
@@ -819,6 +828,8 @@ public partial class MainWindow : Window
         CodeThemeEditorCombo.SelectedIndex = -1;
         _isLoadingThemes = false;
         CodeThemeTitleBox.Text = $"{source.Title} Custom";
+        CodeThemeFontFamilyBox.Text = source.FontFamily;
+        CodeThemeFontSizeBox.Text = source.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
         _codeThemeFields = CreateCodeThemeFields(source.Colors);
         CodeThemeFieldsList.ItemsSource = _codeThemeFields;
         SetThemeEditorStatus("NEW CODE THEME", "SecondaryAccentBrush");
@@ -826,61 +837,91 @@ public partial class MainWindow : Window
         CodeThemeTitleBox.SelectAll();
     }
 
-    private async void SaveAppThemeButton_Click(object sender, RoutedEventArgs e)
+    private async void SaveThemePanelButton_Click(object sender, RoutedEventArgs e)
     {
+        if (string.IsNullOrWhiteSpace(AppThemeTitleBox.Text))
+        {
+            SetThemeEditorStatus("APP TITLE REQUIRED", "DangerBrush");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(CodeThemeTitleBox.Text))
+        {
+            SetThemeEditorStatus("CODE TITLE REQUIRED", "DangerBrush");
+            return;
+        }
         if (!TryReadAppThemeColors(out var colors))
         {
             SetThemeEditorStatus("INVALID APP COLOR", "DangerBrush");
             return;
         }
-
-        try
-        {
-            var saved = await _themes.UpsertAppThemeAsync(new AppThemeDefinition
-            {
-                Id = _editingAppThemeId ?? string.Empty,
-                Title = AppThemeTitleBox.Text.Trim(),
-                Colors = colors
-            });
-            _state.AppThemeId = saved.Id;
-            _themes.ApplyAppTheme(saved.Id);
-            RefreshThemeControls(saved.Id, _editingCodeThemeId);
-            ScheduleAutosave();
-            SetThemeEditorStatus("APP THEME SAVED", "SuccessBrush");
-        }
-        catch (Exception ex)
-        {
-            SetThemeEditorStatus($"SAVE FAILED: {ex.Message}", "DangerBrush");
-        }
-    }
-
-    private async void SaveCodeThemeButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TryReadCodeThemeColors(out var colors))
+        if (!TryReadCodeThemeColors(out var codeColors))
         {
             SetThemeEditorStatus("INVALID CODE COLOR", "DangerBrush");
             return;
         }
+        if (!ThemeService.IsValidFontFamily(AppThemeFontFamilyBox.Text))
+        {
+            SetThemeEditorStatus("APP FONT FAMILY REQUIRED", "DangerBrush");
+            return;
+        }
+        if (!TryParseFontSize(AppThemeFontSizeBox.Text, out var appFontSize) ||
+            !ThemeService.IsValidAppFontSize(appFontSize))
+        {
+            SetThemeEditorStatus("APP FONT SIZE: 8–16", "DangerBrush");
+            return;
+        }
+        if (!ThemeService.IsValidFontFamily(CodeThemeFontFamilyBox.Text))
+        {
+            SetThemeEditorStatus("CODE FONT FAMILY REQUIRED", "DangerBrush");
+            return;
+        }
+        if (!TryParseFontSize(CodeThemeFontSizeBox.Text, out var codeFontSize) ||
+            !ThemeService.IsValidCodeFontSize(codeFontSize))
+        {
+            SetThemeEditorStatus("CODE FONT SIZE: 8–32", "DangerBrush");
+            return;
+        }
 
+        ThemeSaveButton.IsEnabled = false;
+        ThemeCancelButton.IsEnabled = false;
+        SetThemeEditorStatus("SAVING…", "MutedTextBrush");
         try
         {
-            var saved = await _themes.UpsertCodeThemeAsync(new CodeThemeDefinition
-            {
-                Id = _editingCodeThemeId ?? string.Empty,
-                Title = CodeThemeTitleBox.Text.Trim(),
-                Colors = colors
-            });
-            _state.CodeThemeId = saved.Id;
-            _themes.ApplyCodeTheme(saved.Id);
+            var saved = await _themes.UpsertThemesAsync(
+                new AppThemeDefinition
+                {
+                    Id = _editingAppThemeId ?? string.Empty,
+                    Title = AppThemeTitleBox.Text.Trim(),
+                    FontFamily = AppThemeFontFamilyBox.Text.Trim(),
+                    FontSize = appFontSize,
+                    Colors = colors
+                },
+                new CodeThemeDefinition
+                {
+                    Id = _editingCodeThemeId ?? string.Empty,
+                    Title = CodeThemeTitleBox.Text.Trim(),
+                    FontFamily = CodeThemeFontFamilyBox.Text.Trim(),
+                    FontSize = codeFontSize,
+                    Colors = codeColors
+                });
+            _state.AppThemeId = saved.AppTheme.Id;
+            _state.CodeThemeId = saved.CodeTheme.Id;
+            _themes.ApplyAppTheme(saved.AppTheme.Id);
+            _themes.ApplyCodeTheme(saved.CodeTheme.Id);
             UpdateEditorTheme();
             ApplySyntaxHighlighting();
-            RefreshThemeControls(_editingAppThemeId, saved.Id);
+            RefreshThemeControls(saved.AppTheme.Id, saved.CodeTheme.Id);
             ScheduleAutosave();
-            SetThemeEditorStatus("CODE THEME SAVED", "SuccessBrush");
+            CloseThemePanel();
         }
         catch (Exception ex)
         {
             SetThemeEditorStatus($"SAVE FAILED: {ex.Message}", "DangerBrush");
+        }
+        finally
+        {
+            ThemeSaveButton.IsEnabled = true;
+            ThemeCancelButton.IsEnabled = true;
         }
     }
 
@@ -924,7 +965,7 @@ public partial class MainWindow : Window
     private bool TryReadAppThemeColors(out AppThemeColors colors)
     {
         colors = new AppThemeColors();
-        if (string.IsNullOrWhiteSpace(AppThemeTitleBox.Text) || _appThemeFields.Any(field => !field.IsValid))
+        if (_appThemeFields.Any(field => !field.IsValid))
         {
             return false;
         }
@@ -948,7 +989,7 @@ public partial class MainWindow : Window
     private bool TryReadCodeThemeColors(out CodeThemeColors colors)
     {
         colors = new CodeThemeColors();
-        if (string.IsNullOrWhiteSpace(CodeThemeTitleBox.Text) || _codeThemeFields.Any(field => !field.IsValid))
+        if (_codeThemeFields.Any(field => !field.IsValid))
         {
             return false;
         }
@@ -968,6 +1009,10 @@ public partial class MainWindow : Window
 
     private static string ThemeValue(IEnumerable<ThemeColorField> fields, string key) =>
         fields.First(field => field.Key == key).Value.Trim().ToUpperInvariant();
+
+    private static bool TryParseFontSize(string value, out double fontSize) =>
+        double.TryParse(value, NumberStyles.Float, CultureInfo.CurrentCulture, out fontSize) ||
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out fontSize);
 
     private void PinToggle_Changed(object sender, RoutedEventArgs e)
     {
