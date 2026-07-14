@@ -1,0 +1,397 @@
+<Window x:Class="Scratchdeck.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        mc:Ignorable="d"
+        Title="Scratchdeck"
+        Width="680" Height="480"
+        MinWidth="420" MinHeight="280"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        WindowStartupLocation="Manual"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        SourceInitialized="Window_SourceInitialized"
+        Closing="Window_Closing"
+        Closed="Window_Closed"
+        LocationChanged="Window_PlacementChanged"
+        SizeChanged="Window_PlacementChanged"
+        StateChanged="Window_StateChanged">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="38"
+                            ResizeBorderThickness="6"
+                            GlassFrameThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{DynamicResource AccentBrush}"
+            BorderThickness="1"
+            Background="{DynamicResource WindowBackgroundBrush}"
+            SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="38" />
+                <RowDefinition Height="39" />
+                <RowDefinition Height="33" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="24" />
+            </Grid.RowDefinitions>
+
+            <!-- Custom title bar -->
+            <Grid Grid.Row="0" Background="{DynamicResource SurfaceBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Border Width="22" Height="22"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="1"
+                            Background="{DynamicResource AccentMutedBrush}">
+                        <Path Width="9" Height="15"
+                              Stretch="Fill"
+                              Fill="{DynamicResource SecondaryAccentBrush}"
+                              Data="M7,0 L1,8 L5,8 L3,15 L10,6 L6,6 Z" />
+                    </Border>
+                    <TextBlock Margin="9,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Text="SCRATCHDECK" />
+                    <Border Width="1" Height="13" Margin="10,0"
+                            Background="{DynamicResource BorderBrush}" />
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="9"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="RAPID CAPTURE / LOCAL" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <ToggleButton x:Name="PinToggle"
+                                  Width="44" Height="38"
+                                  Style="{StaticResource ToolToggleStyle}"
+                                  ToolTip="Always on top (Ctrl+Shift+P)"
+                                  Checked="PinToggle_Changed"
+                                  Unchecked="PinToggle_Changed"
+                                  Content="PIN" />
+                    <Button Style="{StaticResource WindowButtonStyle}"
+                            ToolTip="Minimise"
+                            Click="MinimiseButton_Click"
+                            Content="─" />
+                    <Button x:Name="MaximiseButton"
+                            Style="{StaticResource WindowButtonStyle}"
+                            ToolTip="Maximise or restore"
+                            Click="MaximiseButton_Click"
+                            Content="□" />
+                    <Button Style="{StaticResource CloseWindowButtonStyle}"
+                            ToolTip="Close"
+                            Click="CloseButton_Click"
+                            Content="×" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Tabs -->
+            <Grid Grid.Row="1"
+                  Background="{DynamicResource SurfaceBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="39" />
+                </Grid.ColumnDefinitions>
+
+                <ListBox x:Name="TabsList"
+                         ItemsSource="{Binding Tabs}"
+                         SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource TabContainerStyle}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         AllowDrop="True"
+                         SelectionChanged="TabsList_SelectionChanged"
+                         PreviewMouseLeftButtonDown="TabsList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="TabsList_PreviewMouseMove"
+                         Drop="TabsList_Drop">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Height="38" MinWidth="112" MaxWidth="210"
+                                  PreviewMouseLeftButtonDown="TabHeader_PreviewMouseLeftButtonDown">
+                                <Border x:Name="TabChrome"
+                                        Background="Transparent"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="0,0,1,1" />
+                                <Border x:Name="ActiveLine"
+                                        Height="2"
+                                        VerticalAlignment="Bottom"
+                                        Margin="10,0"
+                                        Background="Transparent" />
+                                <Path x:Name="ActiveCut"
+                                      Width="8" Height="8"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Top"
+                                      Fill="Transparent"
+                                      Data="M0,0 L8,0 L8,8 Z" />
+
+                                <Grid Margin="10,0,4,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="13" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="24" />
+                                    </Grid.ColumnDefinitions>
+                                    <Path x:Name="LockMark"
+                                          Grid.Column="0"
+                                          Width="8" Height="10"
+                                          Stretch="Fill"
+                                          Fill="{DynamicResource SecondaryAccentBrush}"
+                                          Visibility="Collapsed"
+                                          Data="M1,4 L1,9 L7,9 L7,4 Z M2,4 L2,2 C2,0.7 3,0 4,0 C5,0 6,0.7 6,2 L6,4 L5,4 L5,2 C5,1.4 4.6,1 4,1 C3.4,1 3,1.4 3,2 L3,4 Z" />
+
+                                    <Grid Grid.Column="1" Margin="3,0,3,0">
+                                        <TextBlock x:Name="TabTitle"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="{Binding Title}" />
+                                        <TextBox x:Name="RenameTextBox"
+                                                 VerticalAlignment="Center"
+                                                 Height="25"
+                                                 Padding="4,2"
+                                                 Visibility="Collapsed"
+                                                 Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                                 LostKeyboardFocus="RenameTextBox_LostKeyboardFocus"
+                                                 KeyDown="RenameTextBox_KeyDown" />
+                                    </Grid>
+
+                                    <Button Grid.Column="2"
+                                            Width="23" Height="23"
+                                            Padding="0"
+                                            Style="{StaticResource ToolButtonStyle}"
+                                            ToolTip="Close tab (Ctrl+W)"
+                                            Tag="{Binding}"
+                                            Click="TabCloseButton_Click"
+                                            Content="×" />
+                                </Grid>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                                    <Setter TargetName="LockMark" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                                    <Setter TargetName="TabTitle" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="RenameTextBox" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                    <Setter TargetName="TabChrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
+                                    <Setter TargetName="TabChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="ActiveLine" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="ActiveCut" Property="Fill" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource AccentButtonStyle}"
+                        BorderThickness="0,0,0,1"
+                        ToolTip="New tab (Ctrl+T)"
+                        FontSize="20"
+                        FontWeight="Light"
+                        Click="NewTabButton_Click"
+                        Content="+" />
+            </Grid>
+
+            <!-- Compact per-tab controls -->
+            <Grid Grid.Row="2"
+                  Background="{DynamicResource SurfaceRaisedBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center"
+                               Margin="0,0,7,0"
+                               FontSize="9"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="MODE" />
+                    <ComboBox x:Name="SyntaxCombo"
+                              Width="112"
+                              SelectionChanged="SyntaxCombo_SelectionChanged" />
+                </StackPanel>
+
+                <Border Grid.Column="1" Width="1" Height="17" Margin="9,0"
+                        Background="{DynamicResource BorderBrush}" />
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ToggleButton x:Name="LineNumbersToggle"
+                                  Style="{StaticResource ToolToggleStyle}"
+                                  ToolTip="Show line numbers"
+                                  Checked="LineNumbersToggle_Changed"
+                                  Unchecked="LineNumbersToggle_Changed"
+                                  Content="LINES" />
+                    <ToggleButton x:Name="ProtectedToggle"
+                                  Margin="3,0,0,0"
+                                  Style="{StaticResource ToolToggleStyle}"
+                                  ToolTip="Encrypt this tab with Windows DPAPI. Normal tabs are plain text."
+                                  Checked="ProtectedToggle_Changed"
+                                  Unchecked="ProtectedToggle_Changed"
+                                  Content="LOCK" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,9,0" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center"
+                               Margin="0,0,7,0"
+                               FontSize="9"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="THEME" />
+                    <ComboBox x:Name="ThemeCombo"
+                              Width="116"
+                              SelectionChanged="ThemeCombo_SelectionChanged" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Editor and in-editor search -->
+            <Grid Grid.Row="3" Background="{DynamicResource EditorBackgroundBrush}">
+                <avalonEdit:TextEditor x:Name="Editor"
+                                       Background="{DynamicResource EditorBackgroundBrush}"
+                                       Foreground="{DynamicResource EditorForegroundBrush}"
+                                       LineNumbersForeground="{DynamicResource SubtleTextBrush}"
+                                       FontFamily="{StaticResource MonoFont}"
+                                       FontSize="13.5"
+                                       Padding="8,7"
+                                       ShowLineNumbers="True"
+                                       WordWrap="False"
+                                       HorizontalScrollBarVisibility="Auto"
+                                       VerticalScrollBarVisibility="Auto"
+                                       TextChanged="Editor_TextChanged" />
+
+                <StackPanel x:Name="EmptyHint"
+                            IsHitTestVisible="False"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Opacity="0.62">
+                    <Path Width="26" Height="31"
+                          Stretch="Fill"
+                          HorizontalAlignment="Center"
+                          Fill="{DynamicResource AccentMutedBrush}"
+                          Stroke="{DynamicResource AccentBrush}"
+                          StrokeThickness="1"
+                          Data="M16,0 L2,17 L11,17 L7,31 L24,12 L15,12 Z" />
+                    <TextBlock Margin="0,14,0,0"
+                               HorizontalAlignment="Center"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="11"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="PASTE. TYPE. RETRIEVE." />
+                    <TextBlock Margin="0,4,0,0"
+                               HorizontalAlignment="Center"
+                               FontSize="9"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="YOUR WORKSPACE SAVES ITSELF" />
+                </StackPanel>
+
+                <Border x:Name="SearchPanel"
+                        Width="300" Height="35"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,9,12,0"
+                        Background="{DynamicResource SurfaceRaisedBrush}"
+                        BorderBrush="{DynamicResource AccentBrush}"
+                        BorderThickness="1"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="36" />
+                            <ColumnDefinition Width="26" />
+                            <ColumnDefinition Width="26" />
+                            <ColumnDefinition Width="27" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchBox"
+                                 Height="33"
+                                 BorderThickness="0"
+                                 FontFamily="{StaticResource MonoFont}"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="SearchBox_TextChanged"
+                                 KeyDown="SearchBox_KeyDown" />
+                        <TextBlock x:Name="SearchFeedback"
+                                   Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   FontSize="8"
+                                   Foreground="{DynamicResource SecondaryAccentBrush}" />
+                        <Button Grid.Column="2" Padding="0"
+                                Style="{StaticResource ToolButtonStyle}"
+                                ToolTip="Previous match (Shift+Enter)"
+                                Click="SearchPreviousButton_Click"
+                                Content="↑" />
+                        <Button Grid.Column="3" Padding="0"
+                                Style="{StaticResource ToolButtonStyle}"
+                                ToolTip="Next match (Enter)"
+                                Click="SearchNextButton_Click"
+                                Content="↓" />
+                        <Button Grid.Column="4" Padding="0"
+                                Style="{StaticResource ToolButtonStyle}"
+                                ToolTip="Close search (Escape)"
+                                Click="SearchCloseButton_Click"
+                                Content="×" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Status strip -->
+            <Grid Grid.Row="4" Background="{DynamicResource SurfaceBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="CursorStatus"
+                           Margin="11,0,0,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="9"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Text="LN 1  COL 1" />
+                <TextBlock x:Name="CharacterStatus"
+                           Grid.Column="1"
+                           Margin="16,0,0,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="9"
+                           Foreground="{DynamicResource SubtleTextBrush}"
+                           Text="0 CHARS" />
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="0,0,11,0" VerticalAlignment="Center">
+                    <Ellipse x:Name="SaveIndicator"
+                             Width="6" Height="6"
+                             Margin="0,0,6,0"
+                             Fill="{DynamicResource SuccessBrush}" />
+                    <TextBlock x:Name="SaveStatus"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="9"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="AUTOSAVED" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

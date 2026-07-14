@@ -1,0 +1,24 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#050A07" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#08120C" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#0D1B13" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#21442C" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#31E873" />
+    <SolidColorBrush x:Key="AccentMutedBrush" Color="#31E873" Opacity="0.14" />
+    <SolidColorBrush x:Key="SecondaryAccentBrush" Color="#16CDB1" />
+    <SolidColorBrush x:Key="TextBrush" Color="#E2F8E9" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#83AE90" />
+    <SolidColorBrush x:Key="SubtleTextBrush" Color="#4D7158" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#F05D6C" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#31E873" />
+    <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#050B07" />
+    <SolidColorBrush x:Key="EditorForegroundBrush" Color="#D8F4DF" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#185D32" />
+    <SolidColorBrush x:Key="FocusBrush" Color="#31E873" />
+    <SolidColorBrush x:Key="SyntaxCommentBrush" Color="#557961" />
+    <SolidColorBrush x:Key="SyntaxStringBrush" Color="#A5E075" />
+    <SolidColorBrush x:Key="SyntaxKeywordBrush" Color="#35F394" />
+    <SolidColorBrush x:Key="SyntaxNumberBrush" Color="#C8EE68" />
+    <SolidColorBrush x:Key="SyntaxTypeBrush" Color="#48DDBE" />
+</ResourceDictionary>
