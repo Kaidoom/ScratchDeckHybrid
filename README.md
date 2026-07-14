@@ -1,6 +1,6 @@
 # Scratchdeck
 
-Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, and code snippets. It combines a tabbed AvalonEdit workspace with automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and independently selectable app and code themes.
+Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, code snippets, and quick sketches. Every tab is a hybrid document with independent Text and Scratch surfaces, automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and independently selectable app and code themes.
 
 ![Scratchdeck preview](docs/Scratchdeck-preview.png)
 
@@ -43,9 +43,10 @@ The solution is deliberately small:
 - `Services/DpapiProtectionService.cs` uses Windows DPAPI with `CurrentUser` scope. Protected text can only be decrypted by the same Windows user profile.
 - `Services/SingleInstanceService.cs` uses a per-session mutex and named pipe. A second launch tells the existing window to restore and activate.
 - `Services/SyntaxHighlightingService.cs` builds lightweight AvalonEdit definitions from the active theme palette, validates them against loaded content, and falls back to plain text if a definition is unsafe.
+- `Services/InkStrokeSerializationService.cs` stores native WPF ink strokes as compressed, Base64-encoded ISF and safely recovers malformed drawing payloads as an empty canvas.
 - `Services/ThemeService.cs` scans, validates, saves, and applies the JSON theme catalog. Its hard-coded Cyberpunk definitions keep the app usable if the catalog is missing or invalid.
 - `Themes/` supplies the static WPF style system and startup fallback resources; runtime colors are layered in from the catalog.
-- `MainWindow.xaml` and its focused code-behind own the view interactions: tabs, drag reordering, inline rename, search, theme editing, window chrome, and the 400 ms autosave debounce.
+- `MainWindow.xaml` and its focused code-behind own the view interactions: hybrid text/drawing tabs, brush controls, drag reordering, inline rename, search, theme editing, window chrome, and the 400 ms autosave debounce.
 
 Workspace data is stored at:
 
@@ -55,7 +56,7 @@ Workspace data is stored at:
 
 The previous valid workspace is kept as `workspace.backup.json`, and recoverable I/O or parse errors are logged under `%LOCALAPPDATA%\Scratchdeck\logs\`.
 
-Important: normal tabs are stored as plain text in `workspace.json`. Turn on **LOCK** for a tab to store its content as Windows DPAPI ciphertext. This protects data at rest for other Windows users, but it is not a password vault and does not defend against software running as the same signed-in user.
+Important: normal tabs store text directly and drawings as Base64 ink data in `workspace.json`. Turn on **LOCK** for a tab to store both payloads as Windows DPAPI ciphertext. This protects data at rest for other Windows users, but it is not a password vault and does not defend against software running as the same signed-in user.
 
 ## Keyboard shortcuts
 
@@ -70,9 +71,16 @@ Important: normal tabs are stored as plain text in `workspace.json`. Turn on **L
 | `F3` / `Shift+F3` | Next / previous search match |
 | `Escape` | Close search or cancel a tab rename |
 | `Ctrl+Shift+P` | Toggle always-on-top |
-| `Ctrl+Z`, `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands |
+| `Ctrl+Z` | Undo text normally, or remove the most recent stroke in Scratch mode |
+| `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands in Text mode |
 
 Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Right-click in the editor for cursor-aware Cut, Copy, Paste, and Select All commands. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
+
+## Hybrid Text and Scratch tabs
+
+Every tab contains two separate payloads. **TEXT** shows the existing AvalonEdit document, while **SCRATCH** opens a native WPF ink canvas; switching surfaces never draws over or alters the text. The last surface, brush size, selected color, and strokes are restored per tab.
+
+Scratch mode provides brush-size presets and a color button that opens a fixed 5×5 palette. The first ten slots contain common colors and the remaining slots start white for customization. Select a slot, enter a `#RRGGBB` or `#AARRGGBB` value, and choose **ADD** to replace that slot. Custom palette colors persist with the workspace. The status bar changes to show the current `Ctrl+Z` undo hint while drawing.
 
 ## App and code themes
 

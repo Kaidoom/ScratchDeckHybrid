@@ -32,17 +32,23 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
                 WasMaximized = true
             }
         };
+        state.ScratchPalette[10] = "#123456";
         state.Tabs.Add(new TabDocument
         {
             Title = "COMMANDS",
             Content = "dotnet test",
             SyntaxMode = "PowerShell",
-            ShowLineNumbers = false
+            ShowLineNumbers = false,
+            ScratchData = "unprotected-ink-payload",
+            IsScratchMode = true,
+            ScratchBrushColor = "#123456",
+            ScratchBrushSize = 14
         });
         state.Tabs.Add(new TabDocument
         {
             Title = "PRIVATE",
             Content = "classified-needle-9c7f",
+            ScratchData = "classified-drawing-needle-4b2a",
             SyntaxMode = "JSON",
             IsProtected = true
         });
@@ -52,7 +58,9 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var restored = await service.LoadAsync();
 
         Assert.DoesNotContain("classified-needle-9c7f", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("classified-drawing-needle-4b2a", json, StringComparison.Ordinal);
         Assert.Contains("protectedContent", json, StringComparison.Ordinal);
+        Assert.Contains("protectedScratchData", json, StringComparison.Ordinal);
         Assert.DoesNotContain("\"theme\"", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, restored.Tabs.Count);
         Assert.Equal(1, restored.SelectedTabIndex);
@@ -61,9 +69,16 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.True(restored.Topmost);
         Assert.False(restored.AutoWrap);
         Assert.Equal("dotnet test", restored.Tabs[0].Content);
+        Assert.Equal("unprotected-ink-payload", restored.Tabs[0].ScratchData);
+        Assert.True(restored.Tabs[0].IsScratchMode);
+        Assert.Equal("#123456", restored.Tabs[0].ScratchBrushColor);
+        Assert.Equal(14, restored.Tabs[0].ScratchBrushSize);
         Assert.False(restored.Tabs[0].ShowLineNumbers);
         Assert.True(restored.Tabs[1].IsProtected);
         Assert.Equal("classified-needle-9c7f", restored.Tabs[1].Content);
+        Assert.Equal("classified-drawing-needle-4b2a", restored.Tabs[1].ScratchData);
+        Assert.Equal("#123456", restored.ScratchPalette[10]);
+        Assert.Equal(ScratchPaletteService.SlotCount, restored.ScratchPalette.Count);
         Assert.Equal(720, restored.Window.Width);
         Assert.True(restored.Window.WasMaximized);
     }
@@ -139,6 +154,9 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
 
         Assert.True(state.AutoWrap);
         Assert.Equal("kept", state.Tabs[0].Content);
+        Assert.Empty(state.Tabs[0].ScratchData);
+        Assert.False(state.Tabs[0].IsScratchMode);
+        Assert.Equal(ScratchPaletteService.SlotCount, state.ScratchPalette.Count);
         Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
         Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
     }

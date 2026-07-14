@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -20,6 +22,8 @@ public partial class MainWindow : Window
     private readonly WorkspaceState _state;
     private readonly WorkspacePersistenceService _persistence;
     private readonly ThemeService _themes;
+    private readonly ObservableCollection<ScratchPaletteSlot> _scratchPaletteSlots = [];
+    private readonly double[] _scratchBrushSizes = [2, 4, 6, 10, 14, 20, 28, 40];
     private CancellationTokenSource? _autosaveCancellation;
     private TabDocument? _activeTab;
     private TabDocument? _draggedTab;
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
     private string? _editingCodeThemeId;
     private bool _isLoadingEditor;
     private bool _isLoadingThemes;
+    private bool _isLoadingScratch;
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
@@ -51,6 +56,9 @@ public partial class MainWindow : Window
         _isLoadingThemes = true;
         DataContext = _state;
         SyntaxCombo.ItemsSource = SyntaxHighlightingService.Modes;
+        ScratchBrushSizeCombo.ItemsSource = _scratchBrushSizes;
+        ScratchPaletteList.ItemsSource = _scratchPaletteSlots;
+        RefreshScratchPalette();
         RefreshThemeControls();
         ThemeFileStatus.Text = System.IO.Path.GetFileName(_themes.ThemesFilePath);
         ThemeFileStatus.ToolTip = _themes.ThemesFilePath;
@@ -79,7 +87,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             _isReady = true;
-            Editor.Focus();
+            FocusActiveSurface();
         };
     }
 
@@ -142,7 +150,15 @@ public partial class MainWindow : Window
     private void Window_PreviewKeyDown(object sender, WpfKeyEventArgs e)
     {
         var modifiers = Keyboard.Modifiers;
-        if (modifiers == ModifierKeys.Control && e.Key == Key.T)
+        if (_activeTab?.IsScratchMode == true &&
+            modifiers == ModifierKeys.Control &&
+            e.Key == Key.Z &&
+            !ScratchHexColorBox.IsKeyboardFocusWithin)
+        {
+            UndoLastScratchStroke();
+            e.Handled = true;
+        }
+        else if (modifiers == ModifierKeys.Control && e.Key == Key.T)
         {
             CreateNewTab();
             e.Handled = true;
@@ -157,7 +173,7 @@ public partial class MainWindow : Window
             CycleTabs(modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1);
             e.Handled = true;
         }
-        else if (modifiers == ModifierKeys.Control && e.Key == Key.F)
+        else if (modifiers == ModifierKeys.Control && e.Key == Key.F && _activeTab?.IsScratchMode != true)
         {
             OpenSearch();
             e.Handled = true;
@@ -165,6 +181,11 @@ public partial class MainWindow : Window
         else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.P)
         {
             PinToggle.IsChecked = !(PinToggle.IsChecked ?? false);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && ScratchColorPopup.IsOpen)
+        {
+            ScratchColorPopup.IsOpen = false;
             e.Handled = true;
         }
         else if (e.Key == Key.Escape && ThemePanel.Visibility == Visibility.Visible)
@@ -177,7 +198,7 @@ public partial class MainWindow : Window
             CloseSearch();
             e.Handled = true;
         }
-        else if (e.Key == Key.F3)
+        else if (e.Key == Key.F3 && _activeTab?.IsScratchMode != true)
         {
             FindMatch(!modifiers.HasFlag(ModifierKeys.Shift));
             e.Handled = true;
@@ -213,11 +234,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!string.IsNullOrEmpty(tab.Content))
+        if (ReferenceEquals(tab, _activeTab))
+        {
+            CommitActiveTab();
+        }
+
+        if (!string.IsNullOrEmpty(tab.Content) || !string.IsNullOrEmpty(tab.ScratchData))
         {
             var result = MessageBox.Show(
                 this,
-                $"Close '{tab.Title}'? Its content will be removed from the workspace.",
+                $"Close '{tab.Title}'? Its text and scratch content will be removed from the workspace.",
                 "Close tab",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
@@ -265,11 +291,51 @@ public partial class MainWindow : Window
         SyntaxCombo.SelectedItem = _activeTab.SyntaxMode;
         LineNumbersToggle.IsChecked = _activeTab.ShowLineNumbers;
         ProtectedToggle.IsChecked = _activeTab.IsProtected;
+        LoadScratchSurface();
         ApplySyntaxHighlighting();
         Editor.CaretOffset = 0;
+        ApplyTabSurfaceMode();
         _isLoadingEditor = false;
         UpdateEditorStatus();
         UpdateEmptyHint();
+    }
+
+    private void LoadScratchSurface()
+    {
+        if (_activeTab is null)
+        {
+            return;
+        }
+
+        _isLoadingScratch = true;
+        ScratchCanvas.Strokes = InkStrokeSerializationService.Deserialize(_activeTab.ScratchData);
+        _activeTab.ScratchBrushSize = _scratchBrushSizes.Contains(_activeTab.ScratchBrushSize)
+            ? _activeTab.ScratchBrushSize
+            : ScratchPaletteService.DefaultBrushSize;
+        ScratchBrushSizeCombo.SelectedItem = _activeTab.ScratchBrushSize;
+        var paletteIndex = _state.ScratchPalette.FindIndex(color =>
+            color.Equals(_activeTab.ScratchBrushColor, StringComparison.OrdinalIgnoreCase));
+        ScratchPaletteList.SelectedIndex = paletteIndex >= 0 ? paletteIndex : 0;
+        ApplyScratchDrawingAttributes();
+        _isLoadingScratch = false;
+    }
+
+    private void CommitActiveTab()
+    {
+        if (_activeTab is null)
+        {
+            return;
+        }
+
+        _activeTab.Content = Editor.Text;
+        try
+        {
+            _activeTab.ScratchData = InkStrokeSerializationService.Serialize(ScratchCanvas.Strokes);
+        }
+        catch
+        {
+            SetSaveState("DRAW ERROR", "DangerBrush");
+        }
     }
 
     private void ApplySyntaxHighlighting()
@@ -355,7 +421,193 @@ public partial class MainWindow : Window
 
     private void UpdateEmptyHint()
     {
-        EmptyHint.Visibility = string.IsNullOrEmpty(Editor.Text) ? Visibility.Visible : Visibility.Collapsed;
+        EmptyHint.Visibility = _activeTab?.IsScratchMode != true && string.IsNullOrEmpty(Editor.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void ApplyTabSurfaceMode()
+    {
+        var scratchMode = _activeTab?.IsScratchMode == true;
+        var wasLoading = _isLoadingEditor;
+        _isLoadingEditor = true;
+        TextSurfaceModeRadio.IsChecked = !scratchMode;
+        ScratchSurfaceModeRadio.IsChecked = scratchMode;
+        _isLoadingEditor = wasLoading;
+
+        Editor.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        ScratchCanvas.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
+        TextToolsPanel.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        ScratchToolsPanel.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
+        CursorStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        CharacterStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        ModeStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        ScratchHintStatus.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
+        if (scratchMode)
+        {
+            SearchPanel.Visibility = Visibility.Collapsed;
+            SearchFeedback.Text = string.Empty;
+        }
+        UpdateEmptyHint();
+    }
+
+    private void TextSurfaceModeRadio_Checked(object sender, RoutedEventArgs e) => SetTabSurfaceMode(false);
+
+    private void ScratchSurfaceModeRadio_Checked(object sender, RoutedEventArgs e) => SetTabSurfaceMode(true);
+
+    private void SetTabSurfaceMode(bool scratchMode)
+    {
+        if (_isLoadingEditor || _activeTab is null || _activeTab.IsScratchMode == scratchMode)
+        {
+            return;
+        }
+
+        CommitActiveTab();
+        _activeTab.IsScratchMode = scratchMode;
+        ApplyTabSurfaceMode();
+        ScheduleAutosave();
+        Dispatcher.BeginInvoke(FocusActiveSurface, DispatcherPriority.Input);
+    }
+
+    private void FocusActiveSurface()
+    {
+        if (_activeTab?.IsScratchMode == true)
+        {
+            ScratchCanvas.Focus();
+        }
+        else
+        {
+            Editor.Focus();
+        }
+    }
+
+    private void ScratchCanvas_StrokeCollected(object sender, InkCanvasStrokeCollectedEventArgs e)
+    {
+        if (_isLoadingScratch || _activeTab is null)
+        {
+            return;
+        }
+
+        CommitActiveTab();
+        ScheduleAutosave();
+    }
+
+    private void UndoLastScratchStroke()
+    {
+        if (ScratchCanvas.Strokes.Count == 0)
+        {
+            return;
+        }
+
+        ScratchCanvas.Strokes.RemoveAt(ScratchCanvas.Strokes.Count - 1);
+        CommitActiveTab();
+        ScheduleAutosave();
+    }
+
+    private void ScratchBrushSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingScratch || _isLoadingEditor || _activeTab is null ||
+            ScratchBrushSizeCombo.SelectedItem is not double size)
+        {
+            return;
+        }
+
+        _activeTab.ScratchBrushSize = size;
+        ApplyScratchDrawingAttributes();
+        ScheduleAutosave();
+    }
+
+    private void ScratchColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        ScratchColorError.Text = string.Empty;
+        ScratchColorPopup.IsOpen = !ScratchColorPopup.IsOpen;
+    }
+
+    private void ScratchPaletteList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingScratch || _activeTab is null ||
+            ScratchPaletteList.SelectedItem is not ScratchPaletteSlot slot)
+        {
+            return;
+        }
+
+        SetScratchBrushColor(slot.Hex);
+    }
+
+    private void AddScratchColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ThemeService.IsValidColor(ScratchHexColorBox.Text))
+        {
+            ScratchColorError.Text = "USE #RRGGBB OR #AARRGGBB";
+            ScratchHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "DangerBrush");
+            return;
+        }
+
+        var hex = ScratchHexColorBox.Text.Trim().ToUpperInvariant();
+        var slotIndex = ScratchPaletteList.SelectedIndex;
+        if (slotIndex < 0 || slotIndex >= ScratchPaletteService.SlotCount)
+        {
+            slotIndex = ScratchPaletteService.FirstCustomSlot;
+        }
+
+        _state.ScratchPalette[slotIndex] = hex;
+        _scratchPaletteSlots[slotIndex] = new ScratchPaletteSlot(slotIndex, hex);
+        _isLoadingScratch = true;
+        ScratchPaletteList.SelectedIndex = slotIndex;
+        _isLoadingScratch = false;
+        ScratchColorError.Text = string.Empty;
+        ScratchHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "BorderBrush");
+        SetScratchBrushColor(hex);
+    }
+
+    private void SetScratchBrushColor(string hex)
+    {
+        if (_activeTab is null)
+        {
+            return;
+        }
+
+        _activeTab.ScratchBrushColor = hex;
+        ScratchHexColorBox.Text = hex;
+        ApplyScratchDrawingAttributes();
+        ScheduleAutosave();
+    }
+
+    private void ApplyScratchDrawingAttributes()
+    {
+        if (_activeTab is null)
+        {
+            return;
+        }
+
+        var color = ColorConverter.ConvertFromString(_activeTab.ScratchBrushColor) is Color parsed
+            ? parsed
+            : Colors.Cyan;
+        ScratchCanvas.DefaultDrawingAttributes = new DrawingAttributes
+        {
+            Color = color,
+            Width = _activeTab.ScratchBrushSize,
+            Height = _activeTab.ScratchBrushSize,
+            StylusTip = StylusTip.Ellipse,
+            FitToCurve = true,
+            IgnorePressure = true
+        };
+        var swatch = new SolidColorBrush(color);
+        swatch.Freeze();
+        ScratchColorSwatch.Background = swatch;
+        ScratchColorButton.ToolTip = $"Brush color {_activeTab.ScratchBrushColor}";
+        ScratchHexColorBox.Text = _activeTab.ScratchBrushColor;
+    }
+
+    private void RefreshScratchPalette()
+    {
+        _isLoadingScratch = true;
+        _scratchPaletteSlots.Clear();
+        for (var index = 0; index < _state.ScratchPalette.Count; index++)
+        {
+            _scratchPaletteSlots.Add(new ScratchPaletteSlot(index, _state.ScratchPalette[index]));
+        }
+        _isLoadingScratch = false;
     }
 
     private void ScheduleAutosave()
@@ -377,6 +629,7 @@ public partial class MainWindow : Window
         try
         {
             await Task.Delay(400, cancellationToken);
+            CommitActiveTab();
             UpdatePlacementState();
             SetSaveState("SAVING", "AccentBrush");
             await _persistence.SaveAsync(_state, cancellationToken);
@@ -419,6 +672,11 @@ public partial class MainWindow : Window
 
     private void OpenSearch()
     {
+        if (_activeTab?.IsScratchMode == true)
+        {
+            return;
+        }
+
         SearchPanel.Visibility = Visibility.Visible;
         SearchBox.Focus();
         SearchBox.SelectAll();
@@ -428,11 +686,16 @@ public partial class MainWindow : Window
     {
         SearchPanel.Visibility = Visibility.Collapsed;
         SearchFeedback.Text = string.Empty;
-        Editor.Focus();
+        FocusActiveSurface();
     }
 
     private void FindMatch(bool forward, bool restart = false)
     {
+        if (_activeTab?.IsScratchMode == true)
+        {
+            return;
+        }
+
         var query = SearchBox.Text;
         if (string.IsNullOrEmpty(query))
         {
@@ -490,7 +753,7 @@ public partial class MainWindow : Window
 
         if (_activeTab is not null)
         {
-            _activeTab.Content = Editor.Text;
+            CommitActiveTab();
         }
 
         _activeTab = selected;
@@ -800,7 +1063,7 @@ public partial class MainWindow : Window
     {
         ThemePanel.Visibility = Visibility.Collapsed;
         ThemePanelScrim.Visibility = Visibility.Collapsed;
-        Editor.Focus();
+        FocusActiveSurface();
     }
 
     private void NewAppThemeButton_Click(object sender, RoutedEventArgs e)
@@ -1160,6 +1423,7 @@ public partial class MainWindow : Window
 
         _isClosing = true;
         _autosaveCancellation?.Cancel();
+        CommitActiveTab();
         UpdatePlacementState();
         SetSaveState("SAVING", "AccentBrush");
         try

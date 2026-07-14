@@ -135,6 +135,7 @@ public sealed class WorkspacePersistenceService
             AutoWrap = state.AutoWrap,
             AppThemeId = state.AppThemeId,
             CodeThemeId = state.CodeThemeId,
+            ScratchPalette = [.. state.ScratchPalette],
             Tabs = state.Tabs.Select(tab => new PersistedTab
             {
                 Id = tab.Id,
@@ -143,7 +144,14 @@ public sealed class WorkspacePersistenceService
                 ShowLineNumbers = tab.ShowLineNumbers,
                 IsProtected = tab.IsProtected,
                 Content = tab.IsProtected ? null : tab.Content,
-                ProtectedContent = tab.IsProtected ? _protection.Protect(tab.Content) : null
+                ProtectedContent = tab.IsProtected ? _protection.Protect(tab.Content) : null,
+                ScratchData = tab.IsProtected ? null : tab.ScratchData,
+                ProtectedScratchData = tab.IsProtected && !string.IsNullOrEmpty(tab.ScratchData)
+                    ? _protection.Protect(tab.ScratchData)
+                    : null,
+                IsScratchMode = tab.IsScratchMode,
+                ScratchBrushColor = tab.ScratchBrushColor,
+                ScratchBrushSize = tab.ScratchBrushSize
             }).ToList()
         };
     }
@@ -159,6 +167,7 @@ public sealed class WorkspacePersistenceService
             AutoWrap = persisted.AutoWrap,
             AppThemeId = persisted.AppThemeId ?? ThemeService.LegacyAppThemeId(persisted.Theme),
             CodeThemeId = persisted.CodeThemeId ?? ThemeService.LegacyCodeThemeId(persisted.Theme),
+            ScratchPalette = persisted.ScratchPalette ?? ScratchPaletteService.CreateDefaultPalette(),
             Tabs = new ObservableCollection<TabDocument>(persisted.Tabs.Select(tab => new TabDocument
             {
                 Id = tab.Id,
@@ -168,7 +177,15 @@ public sealed class WorkspacePersistenceService
                 IsProtected = tab.IsProtected,
                 Content = tab.IsProtected
                     ? _protection.Unprotect(tab.ProtectedContent ?? throw new JsonException("Protected content is missing."))
-                    : tab.Content ?? string.Empty
+                    : tab.Content ?? string.Empty,
+                ScratchData = tab.IsProtected
+                    ? string.IsNullOrEmpty(tab.ProtectedScratchData)
+                        ? string.Empty
+                        : _protection.Unprotect(tab.ProtectedScratchData)
+                    : tab.ScratchData ?? string.Empty,
+                IsScratchMode = tab.IsScratchMode,
+                ScratchBrushColor = tab.ScratchBrushColor ?? "#19D9F0",
+                ScratchBrushSize = tab.ScratchBrushSize
             }))
         };
     }
@@ -219,6 +236,7 @@ public sealed class WorkspacePersistenceService
         public bool AutoWrap { get; set; } = true;
         public string? AppThemeId { get; set; }
         public string? CodeThemeId { get; set; }
+        public List<string>? ScratchPalette { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Theme { get; set; }
     }
@@ -229,7 +247,12 @@ public sealed class WorkspacePersistenceService
         public string? Title { get; set; }
         public string? Content { get; set; }
         public string? ProtectedContent { get; set; }
+        public string? ScratchData { get; set; }
+        public string? ProtectedScratchData { get; set; }
         public bool IsProtected { get; set; }
+        public bool IsScratchMode { get; set; }
+        public string? ScratchBrushColor { get; set; }
+        public double ScratchBrushSize { get; set; } = ScratchPaletteService.DefaultBrushSize;
         public string? SyntaxMode { get; set; }
         public bool ShowLineNumbers { get; set; } = true;
     }

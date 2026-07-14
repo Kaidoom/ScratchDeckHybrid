@@ -8,9 +8,13 @@ public sealed class TabDocument : INotifyPropertyChanged
     private string _title = "Untitled";
     private string _content = string.Empty;
     private string _syntaxMode = "Plain Text";
+    private string _scratchData = string.Empty;
+    private string _scratchBrushColor = "#19D9F0";
+    private double _scratchBrushSize = 6;
     private bool _showLineNumbers = true;
     private bool _isProtected;
     private bool _isRenaming;
+    private bool _isScratchMode;
 
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -30,6 +34,30 @@ public sealed class TabDocument : INotifyPropertyChanged
     {
         get => _syntaxMode;
         set => SetField(ref _syntaxMode, value);
+    }
+
+    public string ScratchData
+    {
+        get => _scratchData;
+        set => SetField(ref _scratchData, value);
+    }
+
+    public string ScratchBrushColor
+    {
+        get => _scratchBrushColor;
+        set => SetField(ref _scratchBrushColor, value);
+    }
+
+    public double ScratchBrushSize
+    {
+        get => _scratchBrushSize;
+        set => SetField(ref _scratchBrushSize, value);
+    }
+
+    public bool IsScratchMode
+    {
+        get => _isScratchMode;
+        set => SetField(ref _isScratchMode, value);
     }
 
     public bool ShowLineNumbers
