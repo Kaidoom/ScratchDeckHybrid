@@ -517,6 +517,7 @@
                                        WordWrap="False"
                                        HorizontalScrollBarVisibility="Auto"
                                        VerticalScrollBarVisibility="Auto"
+                                       PreviewMouseWheel="Editor_PreviewMouseWheel"
                                        PreviewMouseRightButtonDown="Editor_PreviewMouseRightButtonDown"
                                        TextChanged="Editor_TextChanged">
                     <avalonEdit:TextEditor.Resources>
@@ -668,6 +669,15 @@
                            FontFamily="{DynamicResource UiFont}"
                            FontSize="{DynamicResource AppFontSize}"
                            Foreground="{DynamicResource SecondaryAccentBrush}" />
+
+                <TextBlock x:Name="FontSizeStatus"
+                           Grid.Column="2"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource UiFont}"
+                           FontSize="{DynamicResource AppFontSize}"
+                           Foreground="{DynamicResource SecondaryAccentBrush}"
+                           Visibility="Collapsed" />
 
                 <TextBlock x:Name="ScratchHintStatus"
                            Grid.Column="0" Grid.ColumnSpan="3"

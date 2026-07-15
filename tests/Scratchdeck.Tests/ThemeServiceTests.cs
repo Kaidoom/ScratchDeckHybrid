@@ -168,6 +168,34 @@ public sealed class ThemeServiceTests : IDisposable
         Assert.Equal(validCode, ThemeService.IsValidCodeFontSize(value));
     }
 
+    [Theory]
+    [InlineData(13.5, 1, 14)]
+    [InlineData(13.5, -1, 13)]
+    [InlineData(32, 1, 32)]
+    [InlineData(8, -1, 8)]
+    public void StepCodeFontSize_UsesHalfPointStepsWithinCodeFontLimits(
+        double current,
+        int direction,
+        double expected)
+    {
+        Assert.Equal(expected, ThemeService.StepCodeFontSize(current, direction));
+    }
+
+    [Fact]
+    public async Task QuickCodeFontSizeChange_PersistsInThemeCatalog()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        var service = new ThemeService(paths);
+        await service.LoadAsync();
+
+        Assert.True(service.TrySetCodeThemeFontSize(ThemeService.DefaultCodeThemeId, 14.5));
+        await service.SaveCatalogAsync();
+
+        var reloaded = new ThemeService(paths);
+        await reloaded.LoadAsync();
+        Assert.Equal(14.5, reloaded.FindCodeTheme(ThemeService.DefaultCodeThemeId)!.FontSize);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_temporaryDirectory))

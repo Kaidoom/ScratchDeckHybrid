@@ -14,6 +14,7 @@ public sealed class ThemeService
     public const double MaxAppFontSize = 16;
     public const double MinCodeFontSize = 8;
     public const double MaxCodeFontSize = 32;
+    public const double CodeFontSizeStep = 0.5;
 
     private readonly WorkspacePaths _paths;
     private readonly SemaphoreSlim _saveLock = new(1, 1);
@@ -25,6 +26,7 @@ public sealed class ThemeService
     };
     private ResourceDictionary? _appResources;
     private ResourceDictionary? _codeResources;
+    private string? _activeCodeThemeId;
 
     public ThemeService(WorkspacePaths paths)
     {
@@ -87,6 +89,23 @@ public sealed class ThemeService
 
     public CodeThemeDefinition? FindCodeTheme(string? id) =>
         CodeThemes.FirstOrDefault(theme => theme.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+    public bool TrySetCodeThemeFontSize(string? id, double fontSize)
+    {
+        var theme = FindCodeTheme(id);
+        if (theme is null || !IsValidCodeFontSize(fontSize))
+        {
+            return false;
+        }
+
+        theme.FontSize = fontSize;
+        if (_codeResources is not null &&
+            theme.Id.Equals(_activeCodeThemeId, StringComparison.OrdinalIgnoreCase))
+        {
+            _codeResources["CodeFontSize"] = fontSize;
+        }
+        return true;
+    }
 
     public bool ApplyAppTheme(string? id)
     {
@@ -154,6 +173,7 @@ public sealed class ThemeService
         };
 
         ReplaceRuntimeDictionary(ref _codeResources, dictionary);
+        _activeCodeThemeId = theme.Id;
         return true;
     }
 
@@ -381,6 +401,12 @@ public sealed class ThemeService
 
     public static bool IsValidCodeFontSize(double value) =>
         double.IsFinite(value) && value >= MinCodeFontSize && value <= MaxCodeFontSize;
+
+    public static double StepCodeFontSize(double current, int direction) =>
+        Math.Clamp(
+            current + (Math.Sign(direction) * CodeFontSizeStep),
+            MinCodeFontSize,
+            MaxCodeFontSize);
 
     private async Task<ThemeCatalog?> TryLoadCatalogAsync(string path, CancellationToken cancellationToken)
     {

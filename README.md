@@ -151,6 +151,8 @@ dotnet run --project .\src\Scratchdeck\Scratchdeck.csproj -c Release
 | `Ctrl+Tab` | Select the next tab |
 | `Ctrl+Shift+Tab` | Select the previous tab |
 | `Ctrl+F` | Open search in Text mode |
+| `Ctrl` + mouse wheel | Increase or decrease the active code theme's font size by 0.5 in Text mode |
+| `Ctrl` + numpad `+` / `-` | Increase or decrease the active code theme's font size by 0.5 in Text mode |
 | `Enter` / `Shift+Enter` | Select the next / previous search match |
 | `F3` / `Shift+F3` | Select the next / previous search match |
 | `Escape` | Close search, close a popup, or cancel a rename |

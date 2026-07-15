@@ -25,7 +25,9 @@ public partial class MainWindow : Window
     private readonly ScratchUndoHistory _scratchUndoHistory = new();
     private readonly ObservableCollection<ScratchPaletteSlot> _scratchPaletteSlots = [];
     private readonly double[] _scratchBrushSizes = [2, 4, 6, 10, 14, 20, 28, 40];
+    private readonly DispatcherTimer _fontSizeStatusTimer = new();
     private CancellationTokenSource? _autosaveCancellation;
+    private CancellationTokenSource? _codeThemeSaveCancellation;
     private TabDocument? _activeTab;
     private TabDocument? _draggedTab;
     private WpfPoint _dragStart;
@@ -45,6 +47,7 @@ public partial class MainWindow : Window
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
+    private bool _hasUnsavedCodeThemeChanges;
 
     public MainWindow(
         WorkspaceState state,
@@ -57,6 +60,9 @@ public partial class MainWindow : Window
         _state.Normalize();
 
         InitializeComponent();
+
+        _fontSizeStatusTimer.Interval = TimeSpan.FromSeconds(1.5);
+        _fontSizeStatusTimer.Tick += (_, _) => HideFontSizeStatus();
 
         _isLoadingEditor = true;
         _isLoadingThemes = true;
@@ -157,7 +163,15 @@ public partial class MainWindow : Window
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
-        if (_activeTab?.IsScratchMode == true &&
+        if (_activeTab?.IsScratchMode != true &&
+            ThemePanel.Visibility != Visibility.Visible &&
+            modifiers == ModifierKeys.Control &&
+            key is Key.Add or Key.Subtract)
+        {
+            AdjustCodeFontSize(key == Key.Add ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (_activeTab?.IsScratchMode == true &&
             modifiers == ModifierKeys.Control &&
             key == Key.Z &&
             !ScratchHexColorBox.IsKeyboardFocusWithin)
@@ -446,6 +460,42 @@ public partial class MainWindow : Window
             : ScrollBarVisibility.Auto;
     }
 
+    private void AdjustCodeFontSize(int direction)
+    {
+        var theme = _themes.FindCodeTheme(_state.CodeThemeId);
+        if (theme is null)
+        {
+            return;
+        }
+
+        var fontSize = ThemeService.StepCodeFontSize(theme.FontSize, direction);
+        if (fontSize != theme.FontSize && _themes.TrySetCodeThemeFontSize(theme.Id, fontSize))
+        {
+            ScheduleCodeThemeSave();
+        }
+
+        ShowFontSizeStatus($"NEW FONT SIZE: {fontSize:0.##}", "SecondaryAccentBrush");
+    }
+
+    private void ShowFontSizeStatus(string text, string brushResource)
+    {
+        _fontSizeStatusTimer.Stop();
+        FontSizeStatus.Text = text;
+        FontSizeStatus.SetResourceReference(TextBlock.ForegroundProperty, brushResource);
+        FontSizeStatus.Visibility = Visibility.Visible;
+        ModeStatus.Visibility = Visibility.Collapsed;
+        _fontSizeStatusTimer.Start();
+    }
+
+    private void HideFontSizeStatus()
+    {
+        _fontSizeStatusTimer.Stop();
+        FontSizeStatus.Visibility = Visibility.Collapsed;
+        ModeStatus.Visibility = _activeTab?.IsScratchMode == true
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
     private void UpdateEditorTheme()
     {
         if (TryFindResource("SelectionBrush") is Brush selection)
@@ -490,6 +540,10 @@ public partial class MainWindow : Window
     private void ApplyTabSurfaceMode()
     {
         var scratchMode = _activeTab?.IsScratchMode == true;
+        if (scratchMode)
+        {
+            HideFontSizeStatus();
+        }
         var wasLoading = _isLoadingEditor;
         _isLoadingEditor = true;
         TextSurfaceModeRadio.IsChecked = !scratchMode;
@@ -502,7 +556,9 @@ public partial class MainWindow : Window
         ScratchToolsPanel.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
         CursorStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
         CharacterStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
-        ModeStatus.Visibility = scratchMode ? Visibility.Collapsed : Visibility.Visible;
+        ModeStatus.Visibility = scratchMode || FontSizeStatus.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         ScratchHintStatus.Visibility = scratchMode ? Visibility.Visible : Visibility.Collapsed;
         if (scratchMode)
         {
@@ -845,6 +901,61 @@ public partial class MainWindow : Window
             _scratchPaletteSlots.Add(new ScratchPaletteSlot(index, _state.ScratchPalette[index]));
         }
         _isLoadingScratch = false;
+    }
+
+    private void ScheduleCodeThemeSave()
+    {
+        if (_isClosing)
+        {
+            return;
+        }
+
+        _hasUnsavedCodeThemeChanges = true;
+        _codeThemeSaveCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _codeThemeSaveCancellation = cancellation;
+        _ = SaveCodeThemeAfterDelayAsync(cancellation);
+    }
+
+    private async Task SaveCodeThemeAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(400, cancellation.Token);
+            await _themes.SaveCatalogAsync(cancellation.Token);
+            if (ReferenceEquals(_codeThemeSaveCancellation, cancellation))
+            {
+                _hasUnsavedCodeThemeChanges = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Another size adjustment restarted the theme-save debounce window.
+        }
+        catch
+        {
+            if (ReferenceEquals(_codeThemeSaveCancellation, cancellation) &&
+                _activeTab?.IsScratchMode != true &&
+                ThemePanel.Visibility != Visibility.Visible)
+            {
+                ShowFontSizeStatus("FONT SIZE SAVE ERROR", "DangerBrush");
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_codeThemeSaveCancellation, cancellation))
+            {
+                _codeThemeSaveCancellation = null;
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    private void CancelCodeThemeSaveDelay()
+    {
+        var cancellation = _codeThemeSaveCancellation;
+        _codeThemeSaveCancellation = null;
+        cancellation?.Cancel();
     }
 
     private void ScheduleAutosave()
@@ -1204,6 +1315,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        HideFontSizeStatus();
         _state.CodeThemeId = theme.Id;
         _themes.ApplyCodeTheme(theme.Id);
         UpdateEditorTheme();
@@ -1286,6 +1398,7 @@ public partial class MainWindow : Window
 
     private void OpenThemePanelButton_Click(object sender, RoutedEventArgs e)
     {
+        HideFontSizeStatus();
         RefreshThemeControls();
         ThemePanelScrim.Visibility = Visibility.Visible;
         ThemePanel.Visibility = Visibility.Visible;
@@ -1384,6 +1497,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        CancelCodeThemeSaveDelay();
         ThemeSaveButton.IsEnabled = false;
         ThemeCancelButton.IsEnabled = false;
         SetThemeEditorStatus("SAVING…", "MutedTextBrush");
@@ -1406,6 +1520,7 @@ public partial class MainWindow : Window
                     FontSize = codeFontSize,
                     Colors = codeColors
                 });
+            _hasUnsavedCodeThemeChanges = false;
             _state.AppThemeId = saved.AppTheme.Id;
             _state.CodeThemeId = saved.CodeTheme.Id;
             _themes.ApplyAppTheme(saved.AppTheme.Id);
@@ -1540,6 +1655,20 @@ public partial class MainWindow : Window
         ScheduleAutosave();
     }
 
+    private void Editor_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_activeTab?.IsScratchMode == true ||
+            ThemePanel.Visibility == Visibility.Visible ||
+            Keyboard.Modifiers != ModifierKeys.Control ||
+            e.Delta == 0)
+        {
+            return;
+        }
+
+        AdjustCodeFontSize(Math.Sign(e.Delta));
+        e.Handled = true;
+    }
+
     private void Editor_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var position = Editor.GetPositionFromPoint(e.GetPosition(Editor));
@@ -1663,18 +1792,38 @@ public partial class MainWindow : Window
 
         _isClosing = true;
         _autosaveCancellation?.Cancel();
+        CancelCodeThemeSaveDelay();
+        _fontSizeStatusTimer.Stop();
         CommitActiveTab();
         UpdatePlacementState();
         SetSaveState("SAVING", "AccentBrush");
+
+        var saveFailed = false;
         try
         {
             await _persistence.SaveAsync(_state);
-            SetSaveState("AUTOSAVED", "SuccessBrush");
         }
         catch
         {
-            SetSaveState("SAVE ERROR", "DangerBrush");
+            saveFailed = true;
         }
+
+        if (_hasUnsavedCodeThemeChanges)
+        {
+            try
+            {
+                await _themes.SaveCatalogAsync();
+                _hasUnsavedCodeThemeChanges = false;
+            }
+            catch
+            {
+                saveFailed = true;
+            }
+        }
+
+        SetSaveState(
+            saveFailed ? "SAVE ERROR" : "AUTOSAVED",
+            saveFailed ? "DangerBrush" : "SuccessBrush");
 
         _allowClose = true;
         Close();
