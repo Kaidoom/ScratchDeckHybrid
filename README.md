@@ -93,18 +93,42 @@ If no valid catalog can be loaded, the built-in themes keep the application usab
 
 ### Building from source
 
+- Windows 10 or Windows 11
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- Visual Studio 2026 with the [**.NET desktop development** workload](https://learn.microsoft.com/visualstudio/install/workload-component-id-vs-enterprise) for IDE build and debugging, or Visual Studio 2022 used alongside the .NET 10 `dotnet` CLI
+- Internet access for the initial NuGet package restore
 
-## Build and run
+The .NET 10 SDK is the complete minimum setup for command-line builds. Visual Studio is not required. For integrated IDE build, debugging, and XAML tooling, use Visual Studio 2026 with the [**.NET desktop development** workload](https://learn.microsoft.com/visualstudio/install/workload-component-id-vs-enterprise). Visual Studio 2022 can still be used as an editor alongside the .NET 10 `dotnet` CLI.
 
-From the repository root:
+## Clone, build, and run
+
+The quickest path puts the complete runnable application in one obvious `Build` folder:
 
 ```powershell
-dotnet restore Scratchdeck.sln
-dotnet build Scratchdeck.sln -c Release
-dotnet run --project src/Scratchdeck/Scratchdeck.csproj -c Release
+git clone https://github.com/Kaidoom/ScratchDeckHybrid.git
+cd ScratchDeckHybrid
+dotnet publish .\src\Scratchdeck\Scratchdeck.csproj -c Release -r win-x64 --self-contained false -o .\Build\win-x64
+& ".\Build\win-x64\Scratchdeck Hybrid.exe"
 ```
+
+`dotnet publish` restores the NuGet packages, builds the application, and writes the complete framework-dependent x64 build to:
+
+```text
+Build\win-x64\
+```
+
+.NET may also create ignored `bin` and `obj` working folders beneath the projects while compiling. Those are normal development artifacts; `Build\win-x64` is the folder to run or package.
+
+The machine running that published build needs the .NET 10 Desktop Runtime. A machine with the .NET 10 SDK already has the required runtime.
+
+## Contributor commands
+
+Compile the complete solution, including the test project:
+
+```powershell
+dotnet build Scratchdeck.sln -c Release
+```
+
+This follows the standard .NET development layout and writes each project's output beneath its own `bin\Release` directory.
 
 Run the automated tests with:
 
@@ -112,20 +136,10 @@ Run the automated tests with:
 dotnet test Scratchdeck.sln -c Release
 ```
 
-Create a framework-dependent Windows x64 build with:
+Run directly from the source tree during development with:
 
 ```powershell
-dotnet publish src/Scratchdeck/Scratchdeck.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained false `
-  -o publish/win-x64
-```
-
-The published executable is written to:
-
-```text
-publish\win-x64\Scratchdeck Hybrid.exe
+dotnet run --project .\src\Scratchdeck\Scratchdeck.csproj -c Release
 ```
 
 ## Keyboard shortcuts
