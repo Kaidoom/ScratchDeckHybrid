@@ -5,7 +5,10 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>Scratchdeck</AssemblyName>
+    <AssemblyName>Scratchdeck Hybrid</AssemblyName>
+    <AssemblyTitle>Scratchdeck Hybrid</AssemblyTitle>
+    <Product>Scratchdeck Hybrid</Product>
+    <Description>A hybrid text and drawing scratchpad for Windows.</Description>
     <RootNamespace>Scratchdeck</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Scratchdeck.ico</ApplicationIcon>

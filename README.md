@@ -1,16 +1,100 @@
-# Scratchdeck
+# Scratchdeck Hybrid
 
-Scratchdeck is a compact, native Windows scratchpad for notes, commands, IDs, code snippets, and quick sketches. Every tab is a hybrid document with independent Text and Scratch surfaces, automatic local persistence, optional per-tab DPAPI protection, persistent line wrapping, a custom dark WPF shell, and independently selectable app and code themes.
+**Scratchdeck Hybrid** is a compact, local-first Windows scratchpad built around hybrid tabs. Every tab combines two independent surfaces: a syntax-aware text document and a freehand drawing canvas. Switch between **TEXT** and **SCRATCH** whenever you need to move from code or notes to a visual idea; both sides stay attached to the same tab and autosave together.
 
-![Scratchdeck preview](docs/Scratchdeck-preview.png)
+It is designed as a fast, practical desktop tool for snippets, commands, IDs, reminders, rough diagrams, and anything else that should be one click away.
+
+## Screenshots
+
+### Text mode
+
+![Go code open in Scratchdeck Hybrid Text mode](docs/Scratchdeck-Hybrid-Text.png)
+
+### Scratch mode
+
+![A multicolor Hello drawing in Scratchdeck Hybrid Scratch mode](docs/Scratchdeck-Hybrid-Scratch.png)
+
+## Highlights
+
+- **Hybrid tabs** — every tab keeps separate Text and Scratch content without one surface overwriting the other.
+- **Code-friendly editor** — syntax highlighting, search, line numbers, persistent wrapping, and a cursor-aware Cut/Copy/Paste context menu.
+- **Native scratch canvas** — mouse and stylus drawing with WPF ink, brush-size presets, drawing undo, reversible board clearing, and a 5×5 color palette.
+- **Quick erase controls** — hold `Shift` for brush erasing or hold `Alt` to remove complete strokes.
+- **Independent app and code themes** — change the shell and editor separately, including their font family and font size.
+- **Custom themes** — create and edit themes inside the app; the catalog is stored as readable JSON.
+- **Desktop utility features** — always-on-top, draggable and renameable tabs, window-position restoration, and single-instance activation.
+- **Local persistence** — workspace content and settings autosave locally, while saved theme changes use their own recovery backup.
+- **Optional tab protection** — **LOCK** protects both sides of a tab with Windows DPAPI for the current Windows user.
+
+## Hybrid tabs
+
+Each tab owns two payloads:
+
+- **TEXT** is an AvalonEdit document for notes and code.
+- **SCRATCH** is a WPF InkCanvas for freehand drawing.
+
+Changing surfaces only changes what is visible. The text, strokes, selected surface, brush size, brush color, syntax mode, line-number setting, and protection state are restored with the tab.
+
+Tabs can be created, closed, renamed by double-clicking, and reordered by dragging. The `+` button stays beside the final tab, while `Ctrl+T`, `Ctrl+W`, and `Ctrl+Tab` provide quick keyboard navigation.
+
+## Text mode
+
+Text mode supports Plain Text, C++, C#, JSON, XML, HTML, PowerShell, Python, JavaScript, Markdown, SQL, Go, and INI highlighting. Highlighting is applied defensively, so unexpected mixed content falls back safely instead of destabilizing the editor.
+
+The editor includes:
+
+- Find with next and previous match navigation
+- Optional line numbers
+- Persistent automatic wrapping
+- Dark, compact scrollbars
+- Standard undo, redo, cut, copy, paste, and select-all commands
+- A cursor-aware Cut, Copy, Paste, and Select All context menu
+- Independent code theme, font family, and font size
+
+## Scratch mode
+
+Scratch mode provides a compact drawing toolbar with brush-size presets and a fixed 5×5 palette. Ten common colors are available immediately; the remaining slots can be replaced with custom `#RRGGBB` or `#AARRGGBB` values.
+
+- Draw normally with the selected size and color.
+- Hold `Shift` for a temporary circular brush eraser.
+- Hold `Alt` for a temporary whole-stroke eraser.
+- Press `Ctrl+Z` to undo the most recent draw, erase pass, or clear action.
+- Use **CLEAR** to empty the board as a single reversible action.
+
+The status bar changes with the active drawing mode so the relevant shortcuts remain visible.
+
+## Themes
+
+The **APP** theme controls the window chrome, surfaces, control states, status colors, and top-to-bottom outer-edge gradient. The **CODE** theme independently controls the editor background, foreground, selection, caret, line numbers, and syntax colors.
+
+Built-in themes include:
+
+- Cyberpunk
+- Amber Terminal
+- Matrix
+- Nord Dark
+
+Open **EDIT** to customize an existing theme or create a new one. App and code themes have separate titles, palettes, font families, and font sizes. **Save** applies both edited halves together; **Cancel** discards unsaved edits.
+
+Themes are loaded from:
+
+```text
+%LOCALAPPDATA%\Scratchdeck\themes.json
+```
+
+If no valid catalog can be loaded, the built-in themes keep the application usable. A missing catalog is recreated automatically.
 
 ## Requirements
 
-- Windows 10 or Windows 11
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) for building
-- Visual Studio 2026 with the **.NET desktop development** workload is optional
+### Running a published build
 
-No installer is required. The only runtime NuGet dependency is AvalonEdit.
+- Windows 10 or Windows 11
+- [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) for the framework-dependent build
+
+### Building from source
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Visual Studio 2026 with the [**.NET desktop development** workload](https://learn.microsoft.com/visualstudio/install/workload-component-id-vs-enterprise) for IDE build and debugging, or Visual Studio 2022 used alongside the .NET 10 `dotnet` CLI
 
 ## Build and run
 
@@ -22,41 +106,27 @@ dotnet build Scratchdeck.sln -c Release
 dotnet run --project src/Scratchdeck/Scratchdeck.csproj -c Release
 ```
 
-Run the tests with:
+Run the automated tests with:
 
 ```powershell
 dotnet test Scratchdeck.sln -c Release
 ```
 
-For a framework-dependent publish that can later be packaged in MSIX:
+Create a framework-dependent Windows x64 build with:
 
 ```powershell
-dotnet publish src/Scratchdeck/Scratchdeck.csproj -c Release -r win-x64 --self-contained false -o publish/win-x64
+dotnet publish src/Scratchdeck/Scratchdeck.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained false `
+  -o publish/win-x64
 ```
 
-## How it works
-
-The solution is deliberately small:
-
-- `Models/` contains the observable tab model, theme catalog, window placement, and workspace state.
-- `Services/WorkspacePersistenceService.cs` maps the live model to a disk DTO, encrypts protected content, performs atomic replacement, rotates one backup, and recovers malformed workspaces.
-- `Services/DpapiProtectionService.cs` uses Windows DPAPI with `CurrentUser` scope. Protected text can only be decrypted by the same Windows user profile.
-- `Services/SingleInstanceService.cs` uses a per-session mutex and named pipe. A second launch tells the existing window to restore and activate.
-- `Services/SyntaxHighlightingService.cs` builds lightweight AvalonEdit definitions from the active theme palette, validates them against loaded content, and falls back to plain text if a definition is unsafe.
-- `Services/InkStrokeSerializationService.cs` stores native WPF ink strokes as compressed, Base64-encoded ISF and safely recovers malformed drawing payloads as an empty canvas.
-- `Services/ThemeService.cs` scans, validates, saves, and applies the JSON theme catalog. Its hard-coded Cyberpunk definitions keep the app usable if the catalog is missing or invalid.
-- `Themes/` supplies the static WPF style system and startup fallback resources; runtime colors are layered in from the catalog.
-- `MainWindow.xaml` and its focused code-behind own the view interactions: hybrid text/drawing tabs, brush controls, drag reordering, inline rename, search, theme editing, window chrome, and the 400 ms autosave debounce.
-
-Workspace data is stored at:
+The published executable is written to:
 
 ```text
-%LOCALAPPDATA%\Scratchdeck\workspace.json
+publish\win-x64\Scratchdeck Hybrid.exe
 ```
-
-The previous valid workspace is kept as `workspace.backup.json`, and recoverable I/O or parse errors are logged under `%LOCALAPPDATA%\Scratchdeck\logs\`.
-
-Important: normal tabs store text directly and drawings as Base64 ink data in `workspace.json`. Turn on **LOCK** for a tab to store both payloads as Windows DPAPI ciphertext. This protects data at rest for other Windows users, but it is not a password vault and does not defend against software running as the same signed-in user.
 
 ## Keyboard shortcuts
 
@@ -66,80 +136,34 @@ Important: normal tabs store text directly and drawings as Base64 ink data in `w
 | `Ctrl+W` | Close the active tab |
 | `Ctrl+Tab` | Select the next tab |
 | `Ctrl+Shift+Tab` | Select the previous tab |
-| `Ctrl+F` | Open search for the active tab |
-| `Enter` / `Shift+Enter` | Next / previous search match |
-| `F3` / `Shift+F3` | Next / previous search match |
-| `Escape` | Close search or cancel a tab rename |
+| `Ctrl+F` | Open search in Text mode |
+| `Enter` / `Shift+Enter` | Select the next / previous search match |
+| `F3` / `Shift+F3` | Select the next / previous search match |
+| `Escape` | Close search, close a popup, or cancel a rename |
 | `Ctrl+Shift+P` | Toggle always-on-top |
-| `Ctrl+Z` | Undo text normally, or undo the latest draw, erase, or clear action in Scratch mode |
-| Hold `Shift` | Temporarily brush-erase parts of strokes on the Scratch canvas |
+| `Ctrl+Z` | Undo text normally, or undo the latest Scratch action |
+| Hold `Shift` | Temporarily brush-erase on the Scratch canvas |
 | Hold `Alt` | Temporarily erase whole strokes on the Scratch canvas |
-| `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard AvalonEdit commands in Text mode |
+| `Ctrl+Y`, `Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+A` | Standard Text-mode editing commands |
 
-Double-click a tab title to rename it. Drag a tab to reorder it. Use **WRAP** beside **PIN** to keep long lines inside the editor; the setting persists for the workspace. Right-click in the editor for cursor-aware Cut, Copy, Paste, and Select All commands. Closing the application never asks for confirmation; closing a tab only asks when that tab contains content.
+## Local data and protection
 
-## Hybrid Text and Scratch tabs
-
-Every tab contains two separate payloads. **TEXT** shows the existing AvalonEdit document, while **SCRATCH** opens a native WPF ink canvas; switching surfaces never draws over or alters the text. The last surface, brush size, selected color, and strokes are restored per tab.
-
-Scratch mode provides brush-size presets and a color button that opens a fixed 5×5 palette. The first ten slots contain common colors and the remaining slots start white for customization. Select a slot, enter a `#RRGGBB` or `#AARRGGBB` value, and choose **ADD** to replace that slot. Custom palette colors persist with the workspace.
-
-Hold `Shift` for a temporary circular brush eraser, or hold `Alt` for a temporary whole-stroke eraser. The current size preset controls both the drawing brush and brush eraser. A continuous erase pass is one undo action. **CLEAR** empties the board as one reversible action. `Ctrl+Z` restores the most recent draw, erase pass, or cleared board, with up to 20 in-memory actions retained per tab. The Scratch status bar displays the active erase mode, eraser size, undo shortcut, and modifier hints.
-
-## App and code themes
-
-The **APP** selector controls window chrome, surfaces, labels, controls, status colors, and the top-to-bottom outer-edge gradient. The **CODE** selector independently controls the editor background, foreground, selection, caret, line numbers, and syntax colors. The built-in choices are Cyberpunk (default), Amber Terminal, Matrix, and Nord Dark.
-
-Use **EDIT** to open the theme panel. Existing themes can be customized in place, while **NEW** starts a copy of the active theme under a new title. App and code themes each have an independent font family and size. App font sizes accept 8–16 pt and code font sizes accept 8–32 pt.
-
-The fixed footer keeps **Save** and **Cancel** available while the color lists scroll. Save validates and writes both edited theme halves in one catalog operation, then applies them together. Cancel, Escape, the panel ×, and clicking the shaded area discard unsaved editor changes. Color values accept `#RRGGBB` or `#AARRGGBB`; invalid values are marked before saving.
-
-Themes are loaded at startup from:
+Scratchdeck Hybrid is local-first and does not require an account. Workspace data is stored under:
 
 ```text
-%LOCALAPPDATA%\Scratchdeck\themes.json
+%LOCALAPPDATA%\Scratchdeck\
 ```
 
-The catalog keeps app and code definitions separate. A shortened example is:
+The folder contains:
 
-```json
-{
-  "schemaVersion": 2,
-  "appThemes": [
-    {
-      "id": "cyberpunk",
-      "title": "Cyberpunk",
-      "fontFamily": "Segoe UI Variable Text, Segoe UI",
-      "fontSize": 11,
-      "colors": {
-        "background": "#060910",
-        "surface": "#0A1019",
-        "outerEdgeTop": "#19D9F0",
-        "outerEdgeBottom": "#FFC247",
-        "primaryAccent": "#19D9F0",
-        "secondaryAccent": "#FFC247"
-      }
-    }
-  ],
-  "codeThemes": [
-    {
-      "id": "cyberpunk-code",
-      "title": "Cyberpunk",
-      "fontFamily": "Cascadia Mono, Consolas",
-      "fontSize": 13.5,
-      "colors": {
-        "background": "#070C14",
-        "foreground": "#E4EBF0",
-        "keyword": "#50C9FF",
-        "string": "#E2D28A"
-      }
-    }
-  ]
-}
-```
+- `workspace.json` — tabs, text, drawings, palette, settings, and window state
+- `workspace.backup.json` — the previous valid workspace
+- `themes.json` — app and code theme definitions
+- `themes.backup.json` — the previous valid theme catalog
+- `logs\` — recoverable persistence and parsing errors
 
-Scratchdeck writes the complete set of color fields when saving. Updates use an atomic temporary file and keep the previous valid catalog as `themes.backup.json`. If neither catalog can be loaded, the hard-coded Cyberpunk catalog is used; on a normal first launch it is also written to `themes.json` for customization.
+Normal tabs store their text and Base64-encoded WPF ink data directly in the workspace. Turning on **LOCK** stores both payloads as Windows DPAPI ciphertext using `CurrentUser` scope. Protected content can only be decrypted by the same Windows user profile. This protects data at rest from other Windows users, but it is not a password vault and does not defend against software already running as the signed-in user.
 
-## Syntax modes
+## Technology
 
-Each tab can use Plain Text, C++, C#, JSON, XML, HTML, PowerShell, Python, JavaScript, Markdown, SQL, Go, or INI highlighting. Text remains plain and is preserved exactly as entered. Unexpected mixed content is validated before a highlighter is activated, so a problematic definition degrades to stable plain-text editing rather than taking down the window.
+Scratchdeck Hybrid is a .NET 10 WPF application. AvalonEdit provides the text editor, WPF InkCanvas provides native drawing data, and the rest of the application uses built-in Windows and .NET APIs for themes, JSON persistence, DPAPI protection, window placement, and single-instance activation.
