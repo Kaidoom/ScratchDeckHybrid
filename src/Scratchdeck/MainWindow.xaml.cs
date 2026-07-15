@@ -997,7 +997,8 @@ public partial class MainWindow : Window
         _activeTab = selected;
         _state.SelectedTabIndex = TabsList.SelectedIndex;
         LoadActiveTab();
-        ScheduleAutosave();
+        // Tab navigation is passive session state. Persist it with the next real
+        // workspace change or on close without presenting it as a pending edit.
     }
 
     private void NewTabButton_Click(object sender, RoutedEventArgs e) => CreateNewTab();
@@ -1630,7 +1631,8 @@ public partial class MainWindow : Window
         if (_isReady && WindowState != WindowState.Minimized)
         {
             UpdatePlacementState();
-            ScheduleAutosave();
+            // Placement is kept current in memory and is persisted with the next
+            // real workspace change or by the close-time save.
         }
     }
 
