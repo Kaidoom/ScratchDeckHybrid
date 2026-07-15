@@ -181,3 +181,11 @@ Normal tabs store their text and Base64-encoded WPF ink data directly in the wor
 ## Technology
 
 Scratchdeck Hybrid is a .NET 10 WPF application. AvalonEdit provides the text editor, WPF InkCanvas provides native drawing data, and the rest of the application uses built-in Windows and .NET APIs for themes, JSON persistence, DPAPI protection, window placement, and single-instance activation.
+
+## License
+
+Scratchdeck is licensed under the MIT License. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 KaidoomDev.
+
+Third-party components remain licensed under their respective licenses. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
