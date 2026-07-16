@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _fontSizeStatusTimer = new();
     private CancellationTokenSource? _autosaveCancellation;
     private CancellationTokenSource? _codeThemeSaveCancellation;
+    private Task? _autosaveTask;
+    private Task? _codeThemeSaveTask;
     private TabDocument? _activeTab;
     private TabDocument? _draggedTab;
     private WpfPoint _dragStart;
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
+    private bool _hasUnsavedWorkspaceChanges;
     private bool _hasUnsavedCodeThemeChanges;
 
     public MainWindow(
@@ -914,7 +917,7 @@ public partial class MainWindow : Window
         _codeThemeSaveCancellation?.Cancel();
         var cancellation = new CancellationTokenSource();
         _codeThemeSaveCancellation = cancellation;
-        _ = SaveCodeThemeAfterDelayAsync(cancellation);
+        _codeThemeSaveTask = SaveCodeThemeAfterDelayAsync(cancellation);
     }
 
     private async Task SaveCodeThemeAfterDelayAsync(CancellationTokenSource cancellation)
@@ -946,16 +949,16 @@ public partial class MainWindow : Window
             if (ReferenceEquals(_codeThemeSaveCancellation, cancellation))
             {
                 _codeThemeSaveCancellation = null;
+                _codeThemeSaveTask = null;
             }
             cancellation.Dispose();
         }
     }
 
-    private void CancelCodeThemeSaveDelay()
+    private Task? CancelCodeThemeSaveDelay()
     {
-        var cancellation = _codeThemeSaveCancellation;
-        _codeThemeSaveCancellation = null;
-        cancellation?.Cancel();
+        _codeThemeSaveCancellation?.Cancel();
+        return _codeThemeSaveTask;
     }
 
     private void ScheduleAutosave()
@@ -965,23 +968,31 @@ public partial class MainWindow : Window
             return;
         }
 
+        _hasUnsavedWorkspaceChanges = true;
         _autosaveCancellation?.Cancel();
         var cancellation = new CancellationTokenSource();
         _autosaveCancellation = cancellation;
         SetSaveState("PENDING", "AccentBrush");
-        SaveAfterDelayAsync(cancellation.Token);
+        _autosaveTask = SaveAfterDelayAsync(cancellation);
     }
 
-    private async void SaveAfterDelayAsync(CancellationToken cancellationToken)
+    private async Task SaveAfterDelayAsync(CancellationTokenSource cancellation)
     {
         try
         {
-            await Task.Delay(400, cancellationToken);
+            await Task.Delay(400, cancellation.Token);
             CommitActiveTab();
             UpdatePlacementState();
-            SetSaveState("SAVING", "AccentBrush");
-            await _persistence.SaveAsync(_state, cancellationToken);
-            SetSaveState("AUTOSAVED", "SuccessBrush");
+            if (ReferenceEquals(_autosaveCancellation, cancellation))
+            {
+                SetSaveState("SAVING", "AccentBrush");
+            }
+            await _persistence.SaveAsync(_state, cancellation.Token);
+            if (ReferenceEquals(_autosaveCancellation, cancellation))
+            {
+                _hasUnsavedWorkspaceChanges = false;
+                SetSaveState("AUTOSAVED", "SuccessBrush");
+            }
         }
         catch (OperationCanceledException)
         {
@@ -989,8 +1000,26 @@ public partial class MainWindow : Window
         }
         catch
         {
-            SetSaveState("SAVE ERROR", "DangerBrush");
+            if (ReferenceEquals(_autosaveCancellation, cancellation))
+            {
+                SetSaveState("SAVE ERROR", "DangerBrush");
+            }
         }
+        finally
+        {
+            if (ReferenceEquals(_autosaveCancellation, cancellation))
+            {
+                _autosaveCancellation = null;
+                _autosaveTask = null;
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    private Task? CancelAutosaveDelay()
+    {
+        _autosaveCancellation?.Cancel();
+        return _autosaveTask;
     }
 
     private void SetSaveState(string text, string brushResource)
@@ -1108,8 +1137,8 @@ public partial class MainWindow : Window
         _activeTab = selected;
         _state.SelectedTabIndex = TabsList.SelectedIndex;
         LoadActiveTab();
-        // Tab navigation is passive session state. Persist it with the next real
-        // workspace change or on close without presenting it as a pending edit.
+        // Tab navigation is passive session state. Persist it opportunistically
+        // with the next real workspace save without presenting it as an edit.
     }
 
     private void NewTabButton_Click(object sender, RoutedEventArgs e) => CreateNewTab();
@@ -1497,10 +1526,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        CancelCodeThemeSaveDelay();
+        var pendingCodeThemeSave = CancelCodeThemeSaveDelay();
         ThemeSaveButton.IsEnabled = false;
         ThemeCancelButton.IsEnabled = false;
         SetThemeEditorStatus("SAVING…", "MutedTextBrush");
+        if (pendingCodeThemeSave is not null)
+        {
+            await pendingCodeThemeSave;
+        }
         try
         {
             var saved = await _themes.UpsertThemesAsync(
@@ -1760,8 +1793,8 @@ public partial class MainWindow : Window
         if (_isReady && WindowState != WindowState.Minimized)
         {
             UpdatePlacementState();
-            // Placement is kept current in memory and is persisted with the next
-            // real workspace change or by the close-time save.
+            // Placement is kept current in memory and is persisted opportunistically
+            // with the next real workspace save.
         }
     }
 
@@ -1784,46 +1817,84 @@ public partial class MainWindow : Window
             return;
         }
 
-        e.Cancel = true;
         if (_isClosing)
         {
+            e.Cancel = true;
             return;
         }
 
+        var hasPendingSave = _hasUnsavedWorkspaceChanges ||
+                             _hasUnsavedCodeThemeChanges ||
+                             _autosaveTask is not null ||
+                             _codeThemeSaveTask is not null;
+        if (!hasPendingSave)
+        {
+            _isClosing = true;
+            _allowClose = true;
+            e.Cancel = false;
+            return;
+        }
+
+        e.Cancel = true;
         _isClosing = true;
-        _autosaveCancellation?.Cancel();
-        CancelCodeThemeSaveDelay();
+        var pendingAutosave = CancelAutosaveDelay();
+        var pendingCodeThemeSave = CancelCodeThemeSaveDelay();
         _fontSizeStatusTimer.Stop();
-        CommitActiveTab();
-        UpdatePlacementState();
-        SetSaveState("SAVING", "AccentBrush");
 
-        var saveFailed = false;
-        try
+        // Ensure the canceled Closing event has returned before calling Close again.
+        await Task.Yield();
+        if (pendingAutosave is not null)
         {
-            await _persistence.SaveAsync(_state);
+            await pendingAutosave;
         }
-        catch
+        if (pendingCodeThemeSave is not null)
         {
-            saveFailed = true;
+            await pendingCodeThemeSave;
         }
 
-        if (_hasUnsavedCodeThemeChanges)
+        var saveWorkspace = _hasUnsavedWorkspaceChanges;
+        var saveCodeThemes = _hasUnsavedCodeThemeChanges;
+
+        if (saveWorkspace)
         {
-            try
+            CommitActiveTab();
+            UpdatePlacementState();
+        }
+
+        if (saveWorkspace || saveCodeThemes)
+        {
+            SetSaveState("SAVING", "AccentBrush");
+            var saveFailed = false;
+            if (saveWorkspace)
             {
-                await _themes.SaveCatalogAsync();
-                _hasUnsavedCodeThemeChanges = false;
+                try
+                {
+                    await _persistence.SaveAsync(_state);
+                    _hasUnsavedWorkspaceChanges = false;
+                }
+                catch
+                {
+                    saveFailed = true;
+                }
             }
-            catch
-            {
-                saveFailed = true;
-            }
-        }
 
-        SetSaveState(
-            saveFailed ? "SAVE ERROR" : "AUTOSAVED",
-            saveFailed ? "DangerBrush" : "SuccessBrush");
+            if (saveCodeThemes)
+            {
+                try
+                {
+                    await _themes.SaveCatalogAsync();
+                    _hasUnsavedCodeThemeChanges = false;
+                }
+                catch
+                {
+                    saveFailed = true;
+                }
+            }
+
+            SetSaveState(
+                saveFailed ? "SAVE ERROR" : "AUTOSAVED",
+                saveFailed ? "DangerBrush" : "SuccessBrush");
+        }
 
         _allowClose = true;
         Close();
