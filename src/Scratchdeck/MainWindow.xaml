@@ -254,6 +254,8 @@
                                                    HorizontalAlignment="Left"
                                                    VerticalAlignment="Center"
                                                    Opacity="0.82"
+                                                   ToolTipService.InitialShowDelay="75"
+                                                   ToolTipService.BetweenShowDelay="0"
                                                    Fill="{Binding FolderColorBrush}">
                                             <Rectangle.OpacityMask>
                                                 <ImageBrush ImageSource="Assets/T_Folder.png"
