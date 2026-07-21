@@ -7,8 +7,8 @@
         xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
         mc:Ignorable="d"
         Title="Scratchdeck Hybrid"
-        Width="680" Height="480"
-        MinWidth="420" MinHeight="280"
+        Width="860" Height="480"
+        MinWidth="760" MinHeight="280"
         WindowStyle="None"
         ResizeMode="CanResize"
         AllowsTransparency="False"
@@ -75,6 +75,14 @@
             Background="{DynamicResource WindowBackgroundBrush}"
             SnapsToDevicePixels="True">
         <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FolderPanelColumn"
+                                  Width="176"
+                                  MinWidth="132"
+                                  MaxWidth="300" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="38" />
                 <RowDefinition Height="39" />
@@ -84,7 +92,9 @@
             </Grid.RowDefinitions>
 
             <!-- Custom title bar -->
-            <Grid Grid.Row="0" Background="{DynamicResource SurfaceBrush}">
+            <Grid Grid.Row="0"
+                  Grid.ColumnSpan="3"
+                  Background="{DynamicResource SurfaceBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -149,12 +159,185 @@
                 </StackPanel>
             </Grid>
 
+            <!-- Folder/category sidebar -->
+            <Border Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Grid.Column="0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="39" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="24" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Background="{DynamicResource SurfaceRaisedBrush}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="38" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Margin="11,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="{DynamicResource AppFontSize}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   Text="FOLDERS" />
+                        <Button x:Name="AddFolderButton"
+                                Grid.Column="1"
+                                Padding="0"
+                                Style="{StaticResource PlusTabButtonStyle}"
+                                BorderThickness="1,0,0,1"
+                                FontSize="18"
+                                FontWeight="Light"
+                                ToolTip="Add folder"
+                                Click="AddFolderButton_Click"
+                                Content="+" />
+                    </Grid>
+
+                    <ListBox x:Name="FolderList"
+                             Grid.Row="1"
+                             ItemsSource="{Binding Folders}"
+                             ItemContainerStyle="{StaticResource TabContainerStyle}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             AllowDrop="True"
+                             SelectionChanged="FolderList_SelectionChanged"
+                             PreviewMouseLeftButtonDown="FolderList_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="FolderList_PreviewMouseMove"
+                             Drop="FolderList_Drop">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Height="36"
+                                      PreviewMouseLeftButtonDown="FolderRow_PreviewMouseLeftButtonDown">
+                                    <Grid.ContextMenu>
+                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem Header="Rename folder"
+                                                      Click="RenameFolderMenuItem_Click" />
+                                            <MenuItem Header="Remove folder"
+                                                      Click="RemoveFolderMenuItem_Click" />
+                                        </ContextMenu>
+                                    </Grid.ContextMenu>
+
+                                    <Border x:Name="FolderChrome"
+                                            Margin="5,2"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            BorderThickness="1" />
+                                    <Path x:Name="FolderActiveCut"
+                                          Width="7" Height="7"
+                                          Margin="0,2,5,0"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Top"
+                                          Fill="Transparent"
+                                          Data="{StaticResource SelectedCornerGeometry}" />
+
+                                    <Grid Margin="12,0,10,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="19" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Rectangle x:Name="FolderIcon"
+                                                   Width="14" Height="14"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Center"
+                                                   Fill="{DynamicResource MutedTextBrush}">
+                                            <Rectangle.OpacityMask>
+                                                <ImageBrush ImageSource="Assets/T_Folder.png"
+                                                            Stretch="Uniform" />
+                                            </Rectangle.OpacityMask>
+                                        </Rectangle>
+
+                                        <Grid Grid.Column="1" Margin="3,0,5,0">
+                                            <TextBlock x:Name="FolderTitle"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       FontSize="{DynamicResource AppFontSize}"
+                                                       Foreground="{DynamicResource MutedTextBrush}"
+                                                       Text="{Binding Title}" />
+                                            <TextBox x:Name="FolderRenameTextBox"
+                                                     Height="25"
+                                                     Padding="4,2"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="Collapsed"
+                                                     Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                                     LostKeyboardFocus="FolderRenameTextBox_LostKeyboardFocus"
+                                                     KeyDown="FolderRenameTextBox_KeyDown" />
+                                        </Grid>
+
+                                        <TextBlock Grid.Column="2"
+                                                   MinWidth="20"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Right"
+                                                   FontFamily="{DynamicResource UiFont}"
+                                                   FontSize="{DynamicResource AppFontSize}"
+                                                   Foreground="{DynamicResource SubtleTextBrush}"
+                                                   Text="{Binding Tabs.Count}" />
+                                    </Grid>
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                                        <Setter TargetName="FolderTitle" Property="Visibility" Value="Collapsed" />
+                                        <Setter TargetName="FolderRenameTextBox" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                        <Setter TargetName="FolderChrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
+                                        <Setter TargetName="FolderChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter TargetName="FolderActiveCut" Property="Fill" Value="{DynamicResource SecondaryAccentBrush}" />
+                                        <Setter TargetName="FolderTitle" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                        <Setter TargetName="FolderIcon" Property="Fill" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="2"
+                               Margin="11,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="{DynamicResource AppFontSize}"
+                               Foreground="{DynamicResource SubtleTextBrush}"
+                               Text="DRAG TO REORDER" />
+                </Grid>
+            </Border>
+
+            <GridSplitter x:Name="FolderSplitter"
+                          Grid.Row="1"
+                          Grid.RowSpan="4"
+                          Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          ShowsPreview="False"
+                          DragCompleted="FolderSplitter_DragCompleted">
+                <GridSplitter.Style>
+                    <Style TargetType="GridSplitter">
+                        <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+                        <Setter Property="Opacity" Value="0.45" />
+                        <Setter Property="Cursor" Value="SizeWE" />
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Opacity" Value="0.78" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SecondaryAccentBrush}" />
+                                <Setter Property="Opacity" Value="0.9" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </GridSplitter.Style>
+            </GridSplitter>
+
             <!-- Tabs -->
             <Grid Grid.Row="1"
+                  Grid.Column="2"
                   Background="{DynamicResource SurfaceBrush}">
                 <ListBox x:Name="TabsList"
-                         ItemsSource="{Binding Tabs}"
-                         SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                          ItemContainerStyle="{StaticResource TabContainerStyle}"
                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -272,6 +455,7 @@
 
             <!-- Compact per-tab controls -->
             <Grid Grid.Row="2"
+                  Grid.Column="2"
                   Background="{DynamicResource SurfaceRaisedBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -505,7 +689,9 @@
             </Grid>
 
             <!-- Editor and in-editor search -->
-            <Grid Grid.Row="3" Background="{DynamicResource EditorBackgroundBrush}">
+            <Grid Grid.Row="3"
+                  Grid.Column="2"
+                  Background="{DynamicResource EditorBackgroundBrush}">
                 <avalonEdit:TextEditor x:Name="Editor"
                                        Background="{DynamicResource EditorBackgroundBrush}"
                                        Foreground="{DynamicResource EditorForegroundBrush}"
@@ -638,7 +824,9 @@
             </Grid>
 
             <!-- Status strip -->
-            <Grid Grid.Row="4" Background="{DynamicResource SurfaceBrush}">
+            <Grid Grid.Row="4"
+                  Grid.Column="2"
+                  Background="{DynamicResource SurfaceBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -705,6 +893,7 @@
             <!-- Theme catalog editor -->
             <Border x:Name="ThemePanelScrim"
                     Grid.Row="0" Grid.RowSpan="5"
+                    Grid.Column="0" Grid.ColumnSpan="3"
                     Panel.ZIndex="90"
                     Background="{DynamicResource WindowBackgroundBrush}"
                     Opacity="0.72"
@@ -713,6 +902,7 @@
 
             <Border x:Name="ThemePanel"
                     Grid.Row="0" Grid.RowSpan="5"
+                    Grid.Column="0" Grid.ColumnSpan="3"
                     Panel.ZIndex="100"
                     Width="420"
                     HorizontalAlignment="Right"
@@ -929,13 +1119,13 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="0" Height="1" VerticalAlignment="Bottom"
+            <Border Grid.Row="0" Grid.ColumnSpan="3" Height="1" VerticalAlignment="Bottom"
                     Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
-            <Border Grid.Row="1" Height="1" VerticalAlignment="Bottom"
+            <Border Grid.Row="1" Grid.Column="2" Height="1" VerticalAlignment="Bottom"
                     Background="{DynamicResource AccentMutedBrush}" IsHitTestVisible="False" />
-            <Border Grid.Row="2" Height="1" VerticalAlignment="Bottom"
+            <Border Grid.Row="2" Grid.Column="2" Height="1" VerticalAlignment="Bottom"
                     Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
-            <Border Grid.Row="4" Height="1" VerticalAlignment="Top"
+            <Border Grid.Row="4" Grid.Column="2" Height="1" VerticalAlignment="Top"
                     Background="{DynamicResource BorderBrush}" IsHitTestVisible="False" />
         </Grid>
     </Border>

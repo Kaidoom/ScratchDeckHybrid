@@ -30,9 +30,13 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _codeThemeSaveCancellation;
     private Task? _autosaveTask;
     private Task? _codeThemeSaveTask;
+    private WorkspaceFolder _activeFolder = null!;
     private TabDocument? _activeTab;
+    private WorkspaceFolder? _draggedFolder;
     private TabDocument? _draggedTab;
+    private WpfPoint _folderDragStart;
     private WpfPoint _dragStart;
+    private string _folderRenameOriginalTitle = string.Empty;
     private string _renameOriginalTitle = string.Empty;
     private List<ThemeColorField> _appThemeFields = [];
     private List<ThemeColorField> _codeThemeFields = [];
@@ -46,6 +50,7 @@ public partial class MainWindow : Window
     private bool _isScratchPointerDown;
     private bool _scratchEraseSnapshotRecorded;
     private bool _scratchEditingModeUpdatePending;
+    private bool _isSwitchingFolder;
     private bool _isReady;
     private bool _isClosing;
     private bool _allowClose;
@@ -77,7 +82,11 @@ public partial class MainWindow : Window
         RefreshThemeControls();
         ThemeFileStatus.Text = System.IO.Path.GetFileName(_themes.ThemesFilePath);
         ThemeFileStatus.ToolTip = _themes.ThemesFilePath;
-        TabsList.SelectedIndex = _state.SelectedTabIndex;
+        _activeFolder = _state.Folders[_state.SelectedFolderIndex];
+        FolderPanelColumn.Width = new GridLength(_state.FolderPanelWidth);
+        FolderList.SelectedItem = _activeFolder;
+        TabsList.ItemsSource = _activeFolder.Tabs;
+        TabsList.SelectedIndex = _activeFolder.SelectedTabIndex;
         Topmost = _state.Topmost;
         PinToggle.IsChecked = _state.Topmost;
         WrapToggle.IsChecked = _state.AutoWrap;
@@ -91,7 +100,7 @@ public partial class MainWindow : Window
         ApplyWordWrap();
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdateEditorStatus();
 
-        _activeTab = _state.Tabs[_state.SelectedTabIndex];
+        _activeTab = _activeFolder.Tabs[_activeFolder.SelectedTabIndex];
         LoadActiveTab();
         _isLoadingEditor = false;
         _isLoadingThemes = false;
@@ -285,7 +294,7 @@ public partial class MainWindow : Window
     private void CreateNewTab()
     {
         var tab = new TabDocument { Title = GetNewTabTitle() };
-        _state.Tabs.Add(tab);
+        _activeFolder.Tabs.Add(tab);
         TabsList.SelectedItem = tab;
         ScheduleAutosave();
         Dispatcher.BeginInvoke(Editor.Focus, DispatcherPriority.Input);
@@ -299,7 +308,7 @@ public partial class MainWindow : Window
         {
             title = $"NOTE {index++:00}";
         }
-        while (_state.Tabs.Any(tab => tab.Title.Equals(title, StringComparison.OrdinalIgnoreCase)));
+        while (_activeFolder.Tabs.Any(tab => tab.Title.Equals(title, StringComparison.OrdinalIgnoreCase)));
 
         return title;
     }
@@ -332,26 +341,26 @@ public partial class MainWindow : Window
             }
         }
 
-        var index = _state.Tabs.IndexOf(tab);
-        _state.Tabs.Remove(tab);
+        var index = _activeFolder.Tabs.IndexOf(tab);
+        _activeFolder.Tabs.Remove(tab);
         _scratchUndoHistory.Forget(tab.Id);
-        if (_state.Tabs.Count == 0)
+        if (_activeFolder.Tabs.Count == 0)
         {
-            _state.Tabs.Add(new TabDocument { Title = "QUICK NOTE" });
+            _activeFolder.Tabs.Add(new TabDocument { Title = "QUICK NOTE" });
         }
 
-        TabsList.SelectedIndex = Math.Min(index, _state.Tabs.Count - 1);
+        TabsList.SelectedIndex = Math.Min(index, _activeFolder.Tabs.Count - 1);
         ScheduleAutosave();
     }
 
     private void CycleTabs(int direction)
     {
-        if (_state.Tabs.Count < 2)
+        if (_activeFolder.Tabs.Count < 2)
         {
             return;
         }
 
-        var next = (TabsList.SelectedIndex + direction + _state.Tabs.Count) % _state.Tabs.Count;
+        var next = (TabsList.SelectedIndex + direction + _activeFolder.Tabs.Count) % _activeFolder.Tabs.Count;
         TabsList.SelectedIndex = next;
         TabsList.ScrollIntoView(TabsList.SelectedItem);
     }
@@ -1043,7 +1052,12 @@ public partial class MainWindow : Window
         }
 
         _state.Window.WasMaximized = WindowState == WindowState.Maximized;
-        _state.SelectedTabIndex = Math.Max(0, TabsList.SelectedIndex);
+        _state.SelectedFolderIndex = Math.Max(0, _state.Folders.IndexOf(_activeFolder));
+        _activeFolder.SelectedTabIndex = Math.Max(0, TabsList.SelectedIndex);
+        _state.FolderPanelWidth = Math.Clamp(
+            FolderPanelColumn.ActualWidth,
+            WorkspaceState.MinFolderPanelWidth,
+            WorkspaceState.MaxFolderPanelWidth);
         _state.Topmost = Topmost;
     }
 
@@ -1121,9 +1135,342 @@ public partial class MainWindow : Window
         Editor.ScrollToLine(line);
     }
 
+    private void AddFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        CommitActiveTab();
+
+        var folder = new WorkspaceFolder { Title = GetNewFolderTitle() };
+        folder.Tabs.Add(new TabDocument { Title = "QUICK NOTE" });
+        _state.Folders.Add(folder);
+        ActivateFolder(folder, commitCurrent: false);
+        ScheduleAutosave();
+
+        FolderList.ScrollIntoView(folder);
+        Dispatcher.BeginInvoke(() => BeginFolderRename(folder), DispatcherPriority.Input);
+    }
+
+    private string GetNewFolderTitle()
+    {
+        var index = 1;
+        string title;
+        do
+        {
+            title = $"FOLDER {index++:00}";
+        }
+        while (_state.Folders.Any(folder =>
+                   folder.Title.Equals(title, StringComparison.OrdinalIgnoreCase)));
+
+        return title;
+    }
+
+    private void FolderList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingEditor || _isSwitchingFolder ||
+            FolderList.SelectedItem is not WorkspaceFolder selected)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(selected, _activeFolder))
+        {
+            _state.SelectedFolderIndex = FolderList.SelectedIndex;
+            return;
+        }
+
+        ActivateFolder(selected, commitCurrent: true);
+        Dispatcher.BeginInvoke(FocusActiveSurface, DispatcherPriority.Input);
+        // Folder navigation is passive session state. It is persisted with the
+        // next real workspace change without presenting a redundant save.
+    }
+
+    private void ActivateFolder(WorkspaceFolder folder, bool commitCurrent)
+    {
+        if (!_state.Folders.Contains(folder))
+        {
+            return;
+        }
+
+        if (commitCurrent && _activeTab is not null)
+        {
+            CancelScratchPointerGesture();
+            CommitActiveTab();
+            _activeFolder.SelectedTabIndex = Math.Max(0, TabsList.SelectedIndex);
+        }
+
+        _isSwitchingFolder = true;
+        try
+        {
+            ScratchColorPopup.IsOpen = false;
+            SearchPanel.Visibility = Visibility.Collapsed;
+            SearchFeedback.Text = string.Empty;
+
+            _activeFolder = folder;
+            _state.SelectedFolderIndex = _state.Folders.IndexOf(folder);
+            folder.SelectedTabIndex = Math.Clamp(folder.SelectedTabIndex, 0, folder.Tabs.Count - 1);
+            FolderList.SelectedItem = folder;
+            TabsList.ItemsSource = folder.Tabs;
+            TabsList.SelectedIndex = folder.SelectedTabIndex;
+            _activeTab = folder.Tabs[folder.SelectedTabIndex];
+            LoadActiveTab();
+        }
+        finally
+        {
+            _isSwitchingFolder = false;
+        }
+    }
+
+    private void FolderRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount != 2 ||
+            FindAncestor<Button>(e.OriginalSource as DependencyObject) is not null ||
+            sender is not FrameworkElement { DataContext: WorkspaceFolder folder })
+        {
+            return;
+        }
+
+        BeginFolderRename(folder);
+        e.Handled = true;
+    }
+
+    private void RenameFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceFolder folder })
+        {
+            BeginFolderRename(folder);
+        }
+    }
+
+    private void RemoveFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceFolder folder })
+        {
+            RemoveFolder(folder);
+        }
+    }
+
+    private void BeginFolderRename(WorkspaceFolder folder)
+    {
+        if (!_state.Folders.Contains(folder))
+        {
+            return;
+        }
+
+        FolderList.SelectedItem = folder;
+        FolderList.ScrollIntoView(folder);
+        _folderRenameOriginalTitle = folder.Title;
+        folder.IsRenaming = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (FolderList.ItemContainerGenerator.ContainerFromItem(folder) is ListBoxItem container &&
+                FindVisualChild<TextBox>(container, "FolderRenameTextBox") is { } textBox)
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }
+        }, DispatcherPriority.Input);
+    }
+
+    private void FolderRenameTextBox_KeyDown(object sender, WpfKeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: WorkspaceFolder folder })
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            CommitFolderRename(folder);
+            FocusActiveSurface();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            folder.Title = _folderRenameOriginalTitle;
+            folder.IsRenaming = false;
+            FocusActiveSurface();
+            e.Handled = true;
+        }
+    }
+
+    private void FolderRenameTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: WorkspaceFolder { IsRenaming: true } folder })
+        {
+            CommitFolderRename(folder);
+        }
+    }
+
+    private void CommitFolderRename(WorkspaceFolder folder)
+    {
+        var normalized = string.IsNullOrWhiteSpace(folder.Title)
+            ? _folderRenameOriginalTitle
+            : folder.Title.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            normalized = "Untitled Folder";
+        }
+
+        var changed = !normalized.Equals(_folderRenameOriginalTitle, StringComparison.Ordinal);
+        folder.Title = normalized;
+        folder.IsRenaming = false;
+        if (changed)
+        {
+            ScheduleAutosave();
+        }
+    }
+
+    private void RemoveFolder(WorkspaceFolder folder)
+    {
+        if (!_state.Folders.Contains(folder))
+        {
+            return;
+        }
+
+        if (_state.Folders.Count == 1)
+        {
+            MessageBox.Show(
+                this,
+                "Scratchdeck needs at least one folder. Add another folder before removing this one.",
+                "Cannot remove folder",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var tabLabel = folder.Tabs.Count == 1 ? "tab" : "tabs";
+        var result = MessageBox.Show(
+            this,
+            $"Remove '{folder.Title}' and its {folder.Tabs.Count} {tabLabel}? All text and scratch content in this folder will be removed.",
+            "Remove folder",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        CommitActiveTab();
+        var removedIndex = _state.Folders.IndexOf(folder);
+        var wasActive = ReferenceEquals(folder, _activeFolder);
+        foreach (var tab in folder.Tabs)
+        {
+            _scratchUndoHistory.Forget(tab.Id);
+        }
+
+        _isSwitchingFolder = true;
+        try
+        {
+            _state.Folders.Remove(folder);
+        }
+        finally
+        {
+            _isSwitchingFolder = false;
+        }
+
+        var nextFolder = wasActive
+            ? _state.Folders[Math.Min(removedIndex, _state.Folders.Count - 1)]
+            : _activeFolder;
+        ActivateFolder(nextFolder, commitCurrent: false);
+        ScheduleAutosave();
+    }
+
+    private void FolderList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _folderDragStart = e.GetPosition(FolderList);
+        _draggedFolder = null;
+        var source = e.OriginalSource as DependencyObject;
+        if (FindAncestor<Button>(source) is not null || FindAncestor<TextBox>(source) is not null)
+        {
+            return;
+        }
+
+        if (FindAncestor<ListBoxItem>(source) is { DataContext: WorkspaceFolder { IsRenaming: false } folder })
+        {
+            _draggedFolder = folder;
+        }
+    }
+
+    private void FolderList_PreviewMouseMove(object sender, WpfMouseEventArgs e)
+    {
+        if (_draggedFolder is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(FolderList);
+        if (Math.Abs(point.X - _folderDragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(point.Y - _folderDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop(
+            FolderList,
+            new DataObject(typeof(WorkspaceFolder), _draggedFolder),
+            DragDropEffects.Move);
+        _draggedFolder = null;
+    }
+
+    private void FolderList_Drop(object sender, WpfDragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(WorkspaceFolder)) ||
+            e.Data.GetData(typeof(WorkspaceFolder)) is not WorkspaceFolder dragged)
+        {
+            return;
+        }
+
+        var oldIndex = _state.Folders.IndexOf(dragged);
+        var targetContainer = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        var targetIndex = targetContainer?.DataContext is WorkspaceFolder target
+            ? _state.Folders.IndexOf(target)
+            : _state.Folders.Count;
+
+        if (targetContainer is not null &&
+            e.GetPosition(targetContainer).Y > targetContainer.ActualHeight / 2)
+        {
+            targetIndex++;
+        }
+
+        if (oldIndex < targetIndex)
+        {
+            targetIndex--;
+        }
+
+        targetIndex = Math.Clamp(targetIndex, 0, _state.Folders.Count - 1);
+        if (oldIndex >= 0 && oldIndex != targetIndex)
+        {
+            _state.Folders.Move(oldIndex, targetIndex);
+            _state.SelectedFolderIndex = _state.Folders.IndexOf(_activeFolder);
+            FolderList.SelectedItem = _activeFolder;
+            ScheduleAutosave();
+        }
+
+        e.Handled = true;
+    }
+
+    private void FolderSplitter_DragCompleted(
+        object sender,
+        System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        var width = Math.Clamp(
+            FolderPanelColumn.ActualWidth,
+            WorkspaceState.MinFolderPanelWidth,
+            WorkspaceState.MaxFolderPanelWidth);
+        FolderPanelColumn.Width = new GridLength(width);
+        if (Math.Abs(width - _state.FolderPanelWidth) < 0.5)
+        {
+            return;
+        }
+
+        _state.FolderPanelWidth = width;
+        ScheduleAutosave();
+    }
+
     private void TabsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isLoadingEditor || TabsList.SelectedItem is not TabDocument selected)
+        if (_isLoadingEditor || _isSwitchingFolder ||
+            TabsList.SelectedItem is not TabDocument selected)
         {
             return;
         }
@@ -1135,7 +1482,7 @@ public partial class MainWindow : Window
         }
 
         _activeTab = selected;
-        _state.SelectedTabIndex = TabsList.SelectedIndex;
+        _activeFolder.SelectedTabIndex = TabsList.SelectedIndex;
         LoadActiveTab();
         // Tab navigation is passive session state. Persist it opportunistically
         // with the next real workspace save without presenting it as an edit.
@@ -1207,13 +1554,19 @@ public partial class MainWindow : Window
 
     private void CommitRename(TabDocument tab)
     {
-        tab.Title = string.IsNullOrWhiteSpace(tab.Title) ? _renameOriginalTitle : tab.Title.Trim();
-        if (string.IsNullOrWhiteSpace(tab.Title))
+        var normalized = string.IsNullOrWhiteSpace(tab.Title) ? _renameOriginalTitle : tab.Title.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
         {
-            tab.Title = "Untitled";
+            normalized = "Untitled";
         }
+
+        var changed = !normalized.Equals(_renameOriginalTitle, StringComparison.Ordinal);
+        tab.Title = normalized;
         tab.IsRenaming = false;
-        ScheduleAutosave();
+        if (changed)
+        {
+            ScheduleAutosave();
+        }
     }
 
     private void TabsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1258,11 +1611,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var oldIndex = _state.Tabs.IndexOf(dragged);
+        var oldIndex = _activeFolder.Tabs.IndexOf(dragged);
         var targetContainer = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
         var targetIndex = targetContainer?.DataContext is TabDocument target
-            ? _state.Tabs.IndexOf(target)
-            : _state.Tabs.Count - 1;
+            ? _activeFolder.Tabs.IndexOf(target)
+            : _activeFolder.Tabs.Count - 1;
 
         if (targetContainer is not null && e.GetPosition(targetContainer).X > targetContainer.ActualWidth / 2)
         {
@@ -1274,10 +1627,10 @@ public partial class MainWindow : Window
             targetIndex--;
         }
 
-        targetIndex = Math.Clamp(targetIndex, 0, _state.Tabs.Count - 1);
+        targetIndex = Math.Clamp(targetIndex, 0, _activeFolder.Tabs.Count - 1);
         if (oldIndex >= 0 && oldIndex != targetIndex)
         {
-            _state.Tabs.Move(oldIndex, targetIndex);
+            _activeFolder.Tabs.Move(oldIndex, targetIndex);
             TabsList.SelectedItem = dragged;
             ScheduleAutosave();
         }
@@ -1810,6 +2163,21 @@ public partial class MainWindow : Window
         MaximiseButton.ToolTip = WindowState == WindowState.Maximized ? "Restore" : "Maximise";
     }
 
+    private void CommitPendingRenames()
+    {
+        if (_state.Folders.FirstOrDefault(folder => folder.IsRenaming) is { } renamingFolder)
+        {
+            CommitFolderRename(renamingFolder);
+        }
+
+        if (_state.Folders
+                .SelectMany(folder => folder.Tabs)
+                .FirstOrDefault(tab => tab.IsRenaming) is { } renamingTab)
+        {
+            CommitRename(renamingTab);
+        }
+    }
+
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (_allowClose)
@@ -1823,6 +2191,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        CommitPendingRenames();
         var hasPendingSave = _hasUnsavedWorkspaceChanges ||
                              _hasUnsavedCodeThemeChanges ||
                              _autosaveTask is not null ||

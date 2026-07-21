@@ -122,12 +122,18 @@ public sealed class WorkspacePersistenceService
         return new PersistedWorkspace
         {
             SchemaVersion = WorkspaceState.CurrentSchemaVersion,
-            SelectedTabIndex = state.SelectedTabIndex,
+            SelectedFolderIndex = state.SelectedFolderIndex,
+            FolderPanelWidth = double.IsFinite(state.FolderPanelWidth)
+                ? Math.Clamp(
+                    state.FolderPanelWidth,
+                    WorkspaceState.MinFolderPanelWidth,
+                    WorkspaceState.MaxFolderPanelWidth)
+                : WorkspaceState.DefaultFolderPanelWidth,
             Window = new WindowPlacement
             {
                 Left = double.IsFinite(state.Window.Left) ? state.Window.Left : 80,
                 Top = double.IsFinite(state.Window.Top) ? state.Window.Top : 80,
-                Width = double.IsFinite(state.Window.Width) ? state.Window.Width : 680,
+                Width = double.IsFinite(state.Window.Width) ? state.Window.Width : 860,
                 Height = double.IsFinite(state.Window.Height) ? state.Window.Height : 480,
                 WasMaximized = state.Window.WasMaximized
             },
@@ -136,57 +142,109 @@ public sealed class WorkspacePersistenceService
             AppThemeId = state.AppThemeId,
             CodeThemeId = state.CodeThemeId,
             ScratchPalette = [.. state.ScratchPalette],
-            Tabs = state.Tabs.Select(tab => new PersistedTab
+            LegacyTabs = null,
+            Folders = state.Folders.Select(folder => new PersistedFolder
             {
-                Id = tab.Id,
-                Title = tab.Title,
-                SyntaxMode = tab.SyntaxMode,
-                ShowLineNumbers = tab.ShowLineNumbers,
-                IsProtected = tab.IsProtected,
-                Content = tab.IsProtected ? null : tab.Content,
-                ProtectedContent = tab.IsProtected ? _protection.Protect(tab.Content) : null,
-                ScratchData = tab.IsProtected ? null : tab.ScratchData,
-                ProtectedScratchData = tab.IsProtected && !string.IsNullOrEmpty(tab.ScratchData)
-                    ? _protection.Protect(tab.ScratchData)
-                    : null,
-                IsScratchMode = tab.IsScratchMode,
-                ScratchBrushColor = tab.ScratchBrushColor,
-                ScratchBrushSize = tab.ScratchBrushSize
+                Id = folder.Id,
+                Title = folder.Title,
+                SelectedTabIndex = folder.SelectedTabIndex,
+                Tabs = folder.Tabs.Select(ToPersistedTab).ToList()
             }).ToList()
         };
     }
 
     private WorkspaceState FromPersisted(PersistedWorkspace persisted)
     {
+        ObservableCollection<WorkspaceFolder> folders;
+        if (persisted.SchemaVersion <= 4)
+        {
+            var legacyTabs = persisted.LegacyTabs
+                ?? throw new JsonException("The legacy tab collection was null.");
+            folders =
+            [
+                new WorkspaceFolder
+                {
+                    Title = "Default",
+                    SelectedTabIndex = persisted.LegacySelectedTabIndex ?? 0,
+                    Tabs = new ObservableCollection<TabDocument>(legacyTabs.Select(FromPersistedTab))
+                }
+            ];
+        }
+        else
+        {
+            var persistedFolders = persisted.Folders
+                ?? throw new JsonException("The folder collection was missing.");
+            folders = new ObservableCollection<WorkspaceFolder>(persistedFolders.Select(FromPersistedFolder));
+        }
+
         return new WorkspaceState
         {
-            SchemaVersion = persisted.SchemaVersion,
-            SelectedTabIndex = persisted.SelectedTabIndex,
+            SchemaVersion = WorkspaceState.CurrentSchemaVersion,
+            Folders = folders,
+            SelectedFolderIndex = persisted.SchemaVersion <= 4 ? 0 : persisted.SelectedFolderIndex,
+            FolderPanelWidth = persisted.FolderPanelWidth,
             Window = persisted.Window ?? new WindowPlacement(),
             Topmost = persisted.Topmost,
             AutoWrap = persisted.AutoWrap,
             AppThemeId = persisted.AppThemeId ?? ThemeService.LegacyAppThemeId(persisted.Theme),
             CodeThemeId = persisted.CodeThemeId ?? ThemeService.LegacyCodeThemeId(persisted.Theme),
-            ScratchPalette = persisted.ScratchPalette ?? ScratchPaletteService.CreateDefaultPalette(),
-            Tabs = new ObservableCollection<TabDocument>(persisted.Tabs.Select(tab => new TabDocument
-            {
-                Id = tab.Id,
-                Title = tab.Title ?? "Untitled",
-                SyntaxMode = tab.SyntaxMode ?? "Plain Text",
-                ShowLineNumbers = tab.ShowLineNumbers,
-                IsProtected = tab.IsProtected,
-                Content = tab.IsProtected
-                    ? _protection.Unprotect(tab.ProtectedContent ?? throw new JsonException("Protected content is missing."))
-                    : tab.Content ?? string.Empty,
-                ScratchData = tab.IsProtected
-                    ? string.IsNullOrEmpty(tab.ProtectedScratchData)
-                        ? string.Empty
-                        : _protection.Unprotect(tab.ProtectedScratchData)
-                    : tab.ScratchData ?? string.Empty,
-                IsScratchMode = tab.IsScratchMode,
-                ScratchBrushColor = tab.ScratchBrushColor ?? "#19D9F0",
-                ScratchBrushSize = tab.ScratchBrushSize
-            }))
+            ScratchPalette = persisted.ScratchPalette ?? ScratchPaletteService.CreateDefaultPalette()
+        };
+    }
+
+    private WorkspaceFolder FromPersistedFolder(PersistedFolder folder)
+    {
+        var tabs = folder.Tabs ?? throw new JsonException("A folder tab collection was null.");
+        return new WorkspaceFolder
+        {
+            Id = folder.Id,
+            Title = folder.Title ?? "Untitled Folder",
+            SelectedTabIndex = folder.SelectedTabIndex,
+            Tabs = new ObservableCollection<TabDocument>(tabs.Select(FromPersistedTab))
+        };
+    }
+
+    private PersistedTab ToPersistedTab(TabDocument tab)
+    {
+        return new PersistedTab
+        {
+            Id = tab.Id,
+            Title = tab.Title,
+            SyntaxMode = tab.SyntaxMode,
+            ShowLineNumbers = tab.ShowLineNumbers,
+            IsProtected = tab.IsProtected,
+            Content = tab.IsProtected ? null : tab.Content,
+            ProtectedContent = tab.IsProtected ? _protection.Protect(tab.Content) : null,
+            ScratchData = tab.IsProtected ? null : tab.ScratchData,
+            ProtectedScratchData = tab.IsProtected && !string.IsNullOrEmpty(tab.ScratchData)
+                ? _protection.Protect(tab.ScratchData)
+                : null,
+            IsScratchMode = tab.IsScratchMode,
+            ScratchBrushColor = tab.ScratchBrushColor,
+            ScratchBrushSize = tab.ScratchBrushSize
+        };
+    }
+
+    private TabDocument FromPersistedTab(PersistedTab tab)
+    {
+        return new TabDocument
+        {
+            Id = tab.Id,
+            Title = tab.Title ?? "Untitled",
+            SyntaxMode = tab.SyntaxMode ?? "Plain Text",
+            ShowLineNumbers = tab.ShowLineNumbers,
+            IsProtected = tab.IsProtected,
+            Content = tab.IsProtected
+                ? _protection.Unprotect(tab.ProtectedContent ?? throw new JsonException("Protected content is missing."))
+                : tab.Content ?? string.Empty,
+            ScratchData = tab.IsProtected
+                ? string.IsNullOrEmpty(tab.ProtectedScratchData)
+                    ? string.Empty
+                    : _protection.Unprotect(tab.ProtectedScratchData)
+                : tab.ScratchData ?? string.Empty,
+            IsScratchMode = tab.IsScratchMode,
+            ScratchBrushColor = tab.ScratchBrushColor ?? "#19D9F0",
+            ScratchBrushSize = tab.ScratchBrushSize
         };
     }
 
@@ -228,9 +286,16 @@ public sealed class WorkspacePersistenceService
 
     private sealed class PersistedWorkspace
     {
-        public int SchemaVersion { get; set; } = WorkspaceState.CurrentSchemaVersion;
-        public List<PersistedTab> Tabs { get; set; } = [];
-        public int SelectedTabIndex { get; set; }
+        public int SchemaVersion { get; set; } = 1;
+        public List<PersistedFolder>? Folders { get; set; }
+        public int SelectedFolderIndex { get; set; }
+        public double FolderPanelWidth { get; set; } = WorkspaceState.DefaultFolderPanelWidth;
+        [JsonPropertyName("tabs")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<PersistedTab>? LegacyTabs { get; set; } = [];
+        [JsonPropertyName("selectedTabIndex")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? LegacySelectedTabIndex { get; set; }
         public WindowPlacement? Window { get; set; }
         public bool Topmost { get; set; }
         public bool AutoWrap { get; set; } = true;
@@ -239,6 +304,14 @@ public sealed class WorkspacePersistenceService
         public List<string>? ScratchPalette { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Theme { get; set; }
+    }
+
+    private sealed class PersistedFolder
+    {
+        public Guid Id { get; set; }
+        public string? Title { get; set; }
+        public List<PersistedTab>? Tabs { get; set; } = [];
+        public int SelectedTabIndex { get; set; }
     }
 
     private sealed class PersistedTab

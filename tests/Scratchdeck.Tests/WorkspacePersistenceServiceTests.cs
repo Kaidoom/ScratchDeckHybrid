@@ -18,7 +18,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
         var state = new WorkspaceState
         {
-            SelectedTabIndex = 1,
+            SelectedFolderIndex = 1,
+            FolderPanelWidth = 244,
             AppThemeId = "amber-terminal",
             CodeThemeId = "matrix-code",
             Topmost = true,
@@ -27,13 +28,18 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
             {
                 Left = 123,
                 Top = 234,
-                Width = 720,
+                Width = 900,
                 Height = 510,
                 WasMaximized = true
             }
         };
         state.ScratchPalette[10] = "#123456";
-        state.Tabs.Add(new TabDocument
+        var commands = new WorkspaceFolder
+        {
+            Title = "Commands",
+            SelectedTabIndex = 0
+        };
+        commands.Tabs.Add(new TabDocument
         {
             Title = "COMMANDS",
             Content = "dotnet test",
@@ -44,7 +50,12 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
             ScratchBrushColor = "#123456",
             ScratchBrushSize = 14
         });
-        state.Tabs.Add(new TabDocument
+        var privateNotes = new WorkspaceFolder
+        {
+            Title = "Private",
+            SelectedTabIndex = 1
+        };
+        privateNotes.Tabs.Add(new TabDocument
         {
             Title = "PRIVATE",
             Content = "classified-needle-9c7f",
@@ -52,34 +63,54 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
             SyntaxMode = "JSON",
             IsProtected = true
         });
+        privateNotes.Tabs.Add(new TabDocument
+        {
+            Title = "REFERENCE",
+            Content = "visible"
+        });
+        state.Folders.Add(commands);
+        state.Folders.Add(privateNotes);
 
         await service.SaveAsync(state);
         var json = await File.ReadAllTextAsync(paths.WorkspaceFile);
         var restored = await service.LoadAsync();
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
 
         Assert.DoesNotContain("classified-needle-9c7f", json, StringComparison.Ordinal);
         Assert.DoesNotContain("classified-drawing-needle-4b2a", json, StringComparison.Ordinal);
         Assert.Contains("protectedContent", json, StringComparison.Ordinal);
         Assert.Contains("protectedScratchData", json, StringComparison.Ordinal);
         Assert.DoesNotContain("\"theme\"", json, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(2, restored.Tabs.Count);
-        Assert.Equal(1, restored.SelectedTabIndex);
+        Assert.Equal(WorkspaceState.CurrentSchemaVersion, root.GetProperty("schemaVersion").GetInt32());
+        Assert.True(root.TryGetProperty("folders", out _));
+        Assert.False(root.TryGetProperty("tabs", out _));
+        Assert.False(root.TryGetProperty("selectedTabIndex", out _));
+        Assert.Equal(2, restored.Folders.Count);
+        Assert.Equal(1, restored.SelectedFolderIndex);
+        Assert.Equal(244, restored.FolderPanelWidth);
+        Assert.Equal("Commands", restored.Folders[0].Title);
+        Assert.Equal("Private", restored.Folders[1].Title);
+        Assert.Equal(commands.Id, restored.Folders[0].Id);
+        Assert.Equal(privateNotes.Id, restored.Folders[1].Id);
+        Assert.Equal(0, restored.Folders[0].SelectedTabIndex);
+        Assert.Equal(1, restored.Folders[1].SelectedTabIndex);
         Assert.Equal("amber-terminal", restored.AppThemeId);
         Assert.Equal("matrix-code", restored.CodeThemeId);
         Assert.True(restored.Topmost);
         Assert.False(restored.AutoWrap);
-        Assert.Equal("dotnet test", restored.Tabs[0].Content);
-        Assert.Equal("unprotected-ink-payload", restored.Tabs[0].ScratchData);
-        Assert.True(restored.Tabs[0].IsScratchMode);
-        Assert.Equal("#123456", restored.Tabs[0].ScratchBrushColor);
-        Assert.Equal(14, restored.Tabs[0].ScratchBrushSize);
-        Assert.False(restored.Tabs[0].ShowLineNumbers);
-        Assert.True(restored.Tabs[1].IsProtected);
-        Assert.Equal("classified-needle-9c7f", restored.Tabs[1].Content);
-        Assert.Equal("classified-drawing-needle-4b2a", restored.Tabs[1].ScratchData);
+        Assert.Equal("dotnet test", restored.Folders[0].Tabs[0].Content);
+        Assert.Equal("unprotected-ink-payload", restored.Folders[0].Tabs[0].ScratchData);
+        Assert.True(restored.Folders[0].Tabs[0].IsScratchMode);
+        Assert.Equal("#123456", restored.Folders[0].Tabs[0].ScratchBrushColor);
+        Assert.Equal(14, restored.Folders[0].Tabs[0].ScratchBrushSize);
+        Assert.False(restored.Folders[0].Tabs[0].ShowLineNumbers);
+        Assert.True(restored.Folders[1].Tabs[0].IsProtected);
+        Assert.Equal("classified-needle-9c7f", restored.Folders[1].Tabs[0].Content);
+        Assert.Equal("classified-drawing-needle-4b2a", restored.Folders[1].Tabs[0].ScratchData);
         Assert.Equal("#123456", restored.ScratchPalette[10]);
         Assert.Equal(ScratchPaletteService.SlotCount, restored.ScratchPalette.Count);
-        Assert.Equal(720, restored.Window.Width);
+        Assert.Equal(900, restored.Window.Width);
         Assert.True(restored.Window.WasMaximized);
     }
 
@@ -89,23 +120,23 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var paths = new WorkspacePaths(_temporaryDirectory);
         var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
         var state = WorkspaceState.CreateDefault();
-        state.Tabs[0].Title = "BACKUP VERSION";
-        state.Tabs[0].Content = "known-good";
+        state.Folders[0].Tabs[0].Title = "BACKUP VERSION";
+        state.Folders[0].Tabs[0].Content = "known-good";
         await service.SaveAsync(state);
 
-        state.Tabs[0].Title = "MIDDLE VERSION";
-        state.Tabs[0].Content = "still-good";
+        state.Folders[0].Tabs[0].Title = "MIDDLE VERSION";
+        state.Folders[0].Tabs[0].Content = "still-good";
         await service.SaveAsync(state);
 
-        state.Tabs[0].Title = "CURRENT VERSION";
-        state.Tabs[0].Content = "newest";
+        state.Folders[0].Tabs[0].Title = "CURRENT VERSION";
+        state.Folders[0].Tabs[0].Content = "newest";
         await service.SaveAsync(state);
         await File.WriteAllTextAsync(paths.WorkspaceFile, "{ definitely-not-json");
 
         var recovered = await service.LoadAsync();
 
-        Assert.Equal("MIDDLE VERSION", recovered.Tabs[0].Title);
-        Assert.Equal("still-good", recovered.Tabs[0].Content);
+        Assert.Equal("MIDDLE VERSION", recovered.Folders[0].Tabs[0].Title);
+        Assert.Equal("still-good", recovered.Folders[0].Tabs[0].Content);
         Assert.True(File.Exists(paths.BackupFile));
         Assert.True(Directory.EnumerateFiles(paths.LogsDirectory, "*.log").Any());
     }
@@ -118,8 +149,10 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
 
         var state = await service.LoadAsync();
 
-        Assert.Single(state.Tabs);
-        Assert.Equal("QUICK NOTE", state.Tabs[0].Title);
+        Assert.Single(state.Folders);
+        Assert.Equal("Default", state.Folders[0].Title);
+        Assert.Single(state.Folders[0].Tabs);
+        Assert.Equal("QUICK NOTE", state.Folders[0].Tabs[0].Title);
         Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
         Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
         Assert.True(state.AutoWrap);
@@ -153,12 +186,133 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var state = await service.LoadAsync();
 
         Assert.True(state.AutoWrap);
-        Assert.Equal("kept", state.Tabs[0].Content);
-        Assert.Empty(state.Tabs[0].ScratchData);
-        Assert.False(state.Tabs[0].IsScratchMode);
+        Assert.Single(state.Folders);
+        Assert.Equal("Default", state.Folders[0].Title);
+        Assert.Equal("kept", state.Folders[0].Tabs[0].Content);
+        Assert.Empty(state.Folders[0].Tabs[0].ScratchData);
+        Assert.False(state.Folders[0].Tabs[0].IsScratchMode);
         Assert.Equal(ScratchPaletteService.SlotCount, state.ScratchPalette.Count);
         Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
         Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
+    }
+
+    [Fact]
+    public async Task Load_SchemaFourWorkspace_MigratesFlatTabsAndNextSaveWritesOnlyFolders()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        Directory.CreateDirectory(paths.DataDirectory);
+        await File.WriteAllTextAsync(paths.WorkspaceFile, """
+            {
+              "schemaVersion": 4,
+              "selectedTabIndex": 1,
+              "autoWrap": false,
+              "appThemeId": "matrix",
+              "codeThemeId": "matrix-code",
+              "tabs": [
+                {
+                  "id": "73ab1517-7626-412d-ab78-1a744c9ee345",
+                  "title": "FIRST",
+                  "content": "one",
+                  "isProtected": false,
+                  "syntaxMode": "Plain Text",
+                  "showLineNumbers": true
+                },
+                {
+                  "id": "660b77a4-252f-4300-ac96-f6305e58939f",
+                  "title": "SECOND",
+                  "content": "two",
+                  "scratchData": "drawing",
+                  "isScratchMode": true,
+                  "isProtected": false,
+                  "syntaxMode": "Markdown",
+                  "showLineNumbers": false
+                }
+              ]
+            }
+            """);
+        var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
+
+        var state = await service.LoadAsync();
+
+        Assert.Equal(WorkspaceState.CurrentSchemaVersion, state.SchemaVersion);
+        Assert.Equal(0, state.SelectedFolderIndex);
+        Assert.Single(state.Folders);
+        Assert.Equal("Default", state.Folders[0].Title);
+        Assert.Equal(1, state.Folders[0].SelectedTabIndex);
+        Assert.Equal(2, state.Folders[0].Tabs.Count);
+        Assert.Equal("two", state.Folders[0].Tabs[1].Content);
+        Assert.Equal("drawing", state.Folders[0].Tabs[1].ScratchData);
+        Assert.True(state.Folders[0].Tabs[1].IsScratchMode);
+        Assert.Equal(WorkspaceState.DefaultFolderPanelWidth, state.FolderPanelWidth);
+
+        await service.SaveAsync(state);
+        using var saved = JsonDocument.Parse(await File.ReadAllTextAsync(paths.WorkspaceFile));
+        var root = saved.RootElement;
+
+        Assert.Equal(WorkspaceState.CurrentSchemaVersion, root.GetProperty("schemaVersion").GetInt32());
+        Assert.True(root.TryGetProperty("folders", out var folders));
+        Assert.Equal(2, folders[0].GetProperty("tabs").GetArrayLength());
+        Assert.False(root.TryGetProperty("tabs", out _));
+        Assert.False(root.TryGetProperty("selectedTabIndex", out _));
+    }
+
+    [Fact]
+    public async Task Load_FutureSchemaPrimary_RecoversCompatibleBackup()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
+        var state = WorkspaceState.CreateDefault();
+        state.Folders[0].Tabs[0].Content = "backup-content";
+        await service.SaveAsync(state);
+
+        state.Folders[0].Tabs[0].Content = "current-content";
+        await service.SaveAsync(state);
+        await File.WriteAllTextAsync(paths.WorkspaceFile, """
+            {
+              "schemaVersion": 999,
+              "folders": []
+            }
+            """);
+
+        var recovered = await service.LoadAsync();
+
+        Assert.Equal("backup-content", recovered.Folders[0].Tabs[0].Content);
+        Assert.True(Directory.EnumerateFiles(paths.LogsDirectory, "*.log").Any());
+    }
+
+    [Fact]
+    public async Task Load_SchemaFourProtectedTab_DecryptsTextAndScratchInsideDefaultFolder()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        Directory.CreateDirectory(paths.DataDirectory);
+        var protection = new DpapiProtectionService();
+        var legacy = new
+        {
+            schemaVersion = 4,
+            selectedTabIndex = 0,
+            tabs = new[]
+            {
+                new
+                {
+                    id = Guid.NewGuid(),
+                    title = "PRIVATE",
+                    protectedContent = protection.Protect("legacy-secret-text"),
+                    protectedScratchData = protection.Protect("legacy-secret-drawing"),
+                    isProtected = true,
+                    syntaxMode = "Plain Text",
+                    showLineNumbers = true
+                }
+            }
+        };
+        await File.WriteAllTextAsync(paths.WorkspaceFile, JsonSerializer.Serialize(legacy));
+        var service = new WorkspacePersistenceService(paths, protection);
+
+        var state = await service.LoadAsync();
+
+        Assert.Single(state.Folders);
+        Assert.True(state.Folders[0].Tabs[0].IsProtected);
+        Assert.Equal("legacy-secret-text", state.Folders[0].Tabs[0].Content);
+        Assert.Equal("legacy-secret-drawing", state.Folders[0].Tabs[0].ScratchData);
     }
 
     public void Dispose()

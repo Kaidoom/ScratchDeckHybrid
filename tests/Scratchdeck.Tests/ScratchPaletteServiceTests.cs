@@ -24,12 +24,18 @@ public sealed class ScratchPaletteServiceTests
         var state = new WorkspaceState
         {
             ScratchPalette = ["bad"],
-            Tabs = new()
+            Folders = new()
             {
-                new TabDocument
+                new WorkspaceFolder
                 {
-                    ScratchBrushColor = "not-a-color",
-                    ScratchBrushSize = double.PositiveInfinity
+                    Tabs = new()
+                    {
+                        new TabDocument
+                        {
+                            ScratchBrushColor = "not-a-color",
+                            ScratchBrushSize = double.PositiveInfinity
+                        }
+                    }
                 }
             }
         };
@@ -37,7 +43,59 @@ public sealed class ScratchPaletteServiceTests
         state.Normalize();
 
         Assert.Equal(ScratchPaletteService.SlotCount, state.ScratchPalette.Count);
-        Assert.Equal(state.ScratchPalette[0], state.Tabs[0].ScratchBrushColor);
-        Assert.Equal(ScratchPaletteService.DefaultBrushSize, state.Tabs[0].ScratchBrushSize);
+        Assert.Equal(state.ScratchPalette[0], state.Folders[0].Tabs[0].ScratchBrushColor);
+        Assert.Equal(ScratchPaletteService.DefaultBrushSize, state.Folders[0].Tabs[0].ScratchBrushSize);
+    }
+
+    [Fact]
+    public void WorkspaceNormalize_RepairsFolderStateAndKeepsIdsUnique()
+    {
+        var duplicateFolderId = Guid.NewGuid();
+        var duplicateTabId = Guid.NewGuid();
+        var state = new WorkspaceState
+        {
+            SelectedFolderIndex = 99,
+            FolderPanelWidth = double.NaN,
+            Window = new WindowPlacement { Width = 300 },
+            Folders = new()
+            {
+                new WorkspaceFolder
+                {
+                    Id = duplicateFolderId,
+                    Title = "  Notes  ",
+                    SelectedTabIndex = 99,
+                    Tabs = new()
+                    {
+                        new TabDocument { Id = duplicateTabId, Title = "  First  " }
+                    }
+                },
+                new WorkspaceFolder
+                {
+                    Id = duplicateFolderId,
+                    Title = " ",
+                    Tabs = new()
+                    {
+                        new TabDocument { Id = duplicateTabId }
+                    }
+                },
+                new WorkspaceFolder { Id = Guid.Empty, Tabs = new() }
+            }
+        };
+
+        state.Normalize();
+
+        Assert.Equal(WorkspaceState.CurrentSchemaVersion, state.SchemaVersion);
+        Assert.Equal(2, state.SelectedFolderIndex);
+        Assert.Equal(WorkspaceState.DefaultFolderPanelWidth, state.FolderPanelWidth);
+        Assert.Equal(760, state.Window.Width);
+        Assert.Equal("Notes", state.Folders[0].Title);
+        Assert.Equal("Untitled Folder", state.Folders[1].Title);
+        Assert.Single(state.Folders[2].Tabs);
+        Assert.Equal("QUICK NOTE", state.Folders[2].Tabs[0].Title);
+        Assert.Equal(0, state.Folders[0].SelectedTabIndex);
+        Assert.Equal(state.Folders.Count, state.Folders.Select(folder => folder.Id).Distinct().Count());
+        Assert.Equal(
+            state.Folders.Sum(folder => folder.Tabs.Count),
+            state.Folders.SelectMany(folder => folder.Tabs).Select(tab => tab.Id).Distinct().Count());
     }
 }

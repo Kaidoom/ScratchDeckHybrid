@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Assets\T_Folder.png" />
+    <Resource Include="Assets\T_Folder.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
