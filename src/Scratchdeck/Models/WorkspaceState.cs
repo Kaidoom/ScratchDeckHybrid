@@ -5,9 +5,9 @@ namespace Scratchdeck.Models;
 
 public sealed class WorkspaceState
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     public const double DefaultFolderPanelWidth = 176;
-    public const double MinFolderPanelWidth = 132;
+    public const double MinFolderPanelWidth = 44;
     public const double MaxFolderPanelWidth = 300;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
@@ -20,6 +20,7 @@ public sealed class WorkspaceState
     public string AppThemeId { get; set; } = ThemeService.DefaultAppThemeId;
     public string CodeThemeId { get; set; } = ThemeService.DefaultCodeThemeId;
     public List<string> ScratchPalette { get; set; } = ScratchPaletteService.CreateDefaultPalette();
+    public List<string> FolderPalette { get; set; } = ScratchPaletteService.CreateDefaultPalette();
 
     public static WorkspaceState CreateDefault()
     {
@@ -43,6 +44,7 @@ public sealed class WorkspaceState
         AppThemeId = string.IsNullOrWhiteSpace(AppThemeId) ? ThemeService.DefaultAppThemeId : AppThemeId;
         CodeThemeId = string.IsNullOrWhiteSpace(CodeThemeId) ? ThemeService.DefaultCodeThemeId : CodeThemeId;
         ScratchPalette = ScratchPaletteService.Normalize(ScratchPalette);
+        FolderPalette = ScratchPaletteService.Normalize(FolderPalette);
         Window ??= new WindowPlacement();
         Window.Width = double.IsFinite(Window.Width) ? Math.Clamp(Window.Width, 760, 4000) : 860;
         Window.Height = double.IsFinite(Window.Height) ? Math.Clamp(Window.Height, 280, 2500) : 480;
@@ -57,6 +59,9 @@ public sealed class WorkspaceState
             }
 
             folder.Title = string.IsNullOrWhiteSpace(folder.Title) ? "Untitled Folder" : folder.Title.Trim();
+            folder.FolderColor = ThemeService.IsValidColor(folder.FolderColor)
+                ? folder.FolderColor.Trim().ToUpperInvariant()
+                : FolderPalette[0];
             folder.Tabs ??= [];
             if (folder.Tabs.Count == 0)
             {

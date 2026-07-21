@@ -19,11 +19,15 @@ namespace Scratchdeck;
 
 public partial class MainWindow : Window
 {
+    private const double FolderPanelCompactThreshold = 88;
+    private const double FolderPanelEditingWidth = 132;
+
     private readonly WorkspaceState _state;
     private readonly WorkspacePersistenceService _persistence;
     private readonly ThemeService _themes;
     private readonly ScratchUndoHistory _scratchUndoHistory = new();
     private readonly ObservableCollection<ScratchPaletteSlot> _scratchPaletteSlots = [];
+    private readonly ObservableCollection<ScratchPaletteSlot> _folderPaletteSlots = [];
     private readonly double[] _scratchBrushSizes = [2, 4, 6, 10, 14, 20, 28, 40];
     private readonly DispatcherTimer _fontSizeStatusTimer = new();
     private CancellationTokenSource? _autosaveCancellation;
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
     private Task? _autosaveTask;
     private Task? _codeThemeSaveTask;
     private WorkspaceFolder _activeFolder = null!;
+    private WorkspaceFolder? _folderColorTarget;
     private TabDocument? _activeTab;
     private WorkspaceFolder? _draggedFolder;
     private TabDocument? _draggedTab;
@@ -38,6 +43,7 @@ public partial class MainWindow : Window
     private WpfPoint _dragStart;
     private string _folderRenameOriginalTitle = string.Empty;
     private string _renameOriginalTitle = string.Empty;
+    private double _lastExpandedFolderPanelWidth = WorkspaceState.DefaultFolderPanelWidth;
     private List<ThemeColorField> _appThemeFields = [];
     private List<ThemeColorField> _codeThemeFields = [];
     private string? _editingAppThemeId;
@@ -45,6 +51,7 @@ public partial class MainWindow : Window
     private bool _isLoadingEditor;
     private bool _isLoadingThemes;
     private bool _isLoadingScratch;
+    private bool _isLoadingFolderColor;
     private bool _isShiftEraseActive;
     private bool _isAltEraseActive;
     private bool _isScratchPointerDown;
@@ -78,12 +85,18 @@ public partial class MainWindow : Window
         SyntaxCombo.ItemsSource = SyntaxHighlightingService.Modes;
         ScratchBrushSizeCombo.ItemsSource = _scratchBrushSizes;
         ScratchPaletteList.ItemsSource = _scratchPaletteSlots;
+        FolderPaletteList.ItemsSource = _folderPaletteSlots;
         RefreshScratchPalette();
+        RefreshFolderPalette();
         RefreshThemeControls();
         ThemeFileStatus.Text = System.IO.Path.GetFileName(_themes.ThemesFilePath);
         ThemeFileStatus.ToolTip = _themes.ThemesFilePath;
         _activeFolder = _state.Folders[_state.SelectedFolderIndex];
         FolderPanelColumn.Width = new GridLength(_state.FolderPanelWidth);
+        _lastExpandedFolderPanelWidth = _state.FolderPanelWidth > FolderPanelCompactThreshold
+            ? _state.FolderPanelWidth
+            : WorkspaceState.DefaultFolderPanelWidth;
+        UpdateFolderPanelCompactState(_state.FolderPanelWidth);
         FolderList.SelectedItem = _activeFolder;
         TabsList.ItemsSource = _activeFolder.Tabs;
         TabsList.SelectedIndex = _activeFolder.SelectedTabIndex;
@@ -186,7 +199,8 @@ public partial class MainWindow : Window
         else if (_activeTab?.IsScratchMode == true &&
             modifiers == ModifierKeys.Control &&
             key == Key.Z &&
-            !ScratchHexColorBox.IsKeyboardFocusWithin)
+            !ScratchHexColorBox.IsKeyboardFocusWithin &&
+            !FolderHexColorBox.IsKeyboardFocusWithin)
         {
             UndoLastScratchAction();
             e.Handled = true;
@@ -225,6 +239,11 @@ public partial class MainWindow : Window
         else if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && key == Key.P)
         {
             PinToggle.IsChecked = !(PinToggle.IsChecked ?? false);
+            e.Handled = true;
+        }
+        else if (key == Key.Escape && FolderColorPopup.IsOpen)
+        {
+            FolderColorPopup.IsOpen = false;
             e.Handled = true;
         }
         else if (key == Key.Escape && ScratchColorPopup.IsOpen)
@@ -915,6 +934,90 @@ public partial class MainWindow : Window
         _isLoadingScratch = false;
     }
 
+    private void RefreshFolderPalette()
+    {
+        _isLoadingFolderColor = true;
+        _folderPaletteSlots.Clear();
+        for (var index = 0; index < _state.FolderPalette.Count; index++)
+        {
+            _folderPaletteSlots.Add(new ScratchPaletteSlot(index, _state.FolderPalette[index]));
+        }
+        _isLoadingFolderColor = false;
+    }
+
+    private void FolderPaletteList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingFolderColor ||
+            FolderPaletteList.SelectedItem is not ScratchPaletteSlot slot)
+        {
+            return;
+        }
+
+        if (ApplyFolderColor(slot.Hex))
+        {
+            ScheduleAutosave();
+        }
+    }
+
+    private void AddFolderColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ThemeService.IsValidColor(FolderHexColorBox.Text))
+        {
+            FolderColorError.Text = "USE #RRGGBB OR #AARRGGBB";
+            FolderHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "DangerBrush");
+            return;
+        }
+
+        var hex = FolderHexColorBox.Text.Trim().ToUpperInvariant();
+        var slotIndex = FolderPaletteList.SelectedIndex;
+        if (slotIndex < 0 || slotIndex >= ScratchPaletteService.SlotCount)
+        {
+            slotIndex = ScratchPaletteService.FirstCustomSlot;
+        }
+
+        var paletteChanged = !_state.FolderPalette[slotIndex]
+            .Equals(hex, StringComparison.OrdinalIgnoreCase);
+        _state.FolderPalette[slotIndex] = hex;
+        _isLoadingFolderColor = true;
+        _folderPaletteSlots[slotIndex] = new ScratchPaletteSlot(slotIndex, hex);
+        FolderPaletteList.SelectedIndex = slotIndex;
+        _isLoadingFolderColor = false;
+        FolderColorError.Text = string.Empty;
+        FolderHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "BorderBrush");
+
+        var colorChanged = ApplyFolderColor(hex);
+        if (paletteChanged || colorChanged)
+        {
+            ScheduleAutosave();
+        }
+    }
+
+    private bool ApplyFolderColor(string hex)
+    {
+        if (_folderColorTarget is null || !_state.Folders.Contains(_folderColorTarget))
+        {
+            FolderColorPopup.IsOpen = false;
+            return false;
+        }
+
+        var normalized = hex.Trim().ToUpperInvariant();
+        FolderHexColorBox.Text = normalized;
+        if (_folderColorTarget.FolderColor.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        _folderColorTarget.FolderColor = normalized;
+        return true;
+    }
+
+    private void FolderColorPopup_Closed(object? sender, EventArgs e)
+    {
+        _folderColorTarget = null;
+        FolderColorError.Text = string.Empty;
+        FolderHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "BorderBrush");
+    }
+
     private void ScheduleCodeThemeSave()
     {
         if (_isClosing)
@@ -1137,6 +1240,7 @@ public partial class MainWindow : Window
 
     private void AddFolderButton_Click(object sender, RoutedEventArgs e)
     {
+        ExpandFolderPanelForEditing(scheduleAutosave: false);
         CommitActiveTab();
 
         var folder = new WorkspaceFolder { Title = GetNewFolderTitle() };
@@ -1201,6 +1305,7 @@ public partial class MainWindow : Window
         try
         {
             ScratchColorPopup.IsOpen = false;
+            FolderColorPopup.IsOpen = false;
             SearchPanel.Visibility = Visibility.Collapsed;
             SearchFeedback.Text = string.Empty;
 
@@ -1240,6 +1345,40 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ChangeFolderColorMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: WorkspaceFolder folder } ||
+            !_state.Folders.Contains(folder))
+        {
+            return;
+        }
+
+        FolderColorPopup.IsOpen = false;
+        _folderColorTarget = folder;
+        FolderColorTargetName.Text = folder.Title;
+        FolderColorError.Text = string.Empty;
+        FolderHexColorBox.Text = folder.FolderColor;
+        FolderHexColorBox.SetResourceReference(TextBox.BorderBrushProperty, "BorderBrush");
+
+        _isLoadingFolderColor = true;
+        FolderPaletteList.SelectedIndex = _state.FolderPalette.FindIndex(color =>
+            color.Equals(folder.FolderColor, StringComparison.OrdinalIgnoreCase));
+        _isLoadingFolderColor = false;
+
+        FolderList.ScrollIntoView(folder);
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_folderColorTarget is null || !_state.Folders.Contains(_folderColorTarget))
+            {
+                return;
+            }
+
+            FolderColorPopup.PlacementTarget =
+                FolderList.ItemContainerGenerator.ContainerFromItem(_folderColorTarget) as UIElement ?? FolderList;
+            FolderColorPopup.IsOpen = true;
+        }, DispatcherPriority.Input);
+    }
+
     private void RemoveFolderMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { DataContext: WorkspaceFolder folder })
@@ -1255,6 +1394,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ExpandFolderPanelForEditing(scheduleAutosave: true);
         FolderList.SelectedItem = folder;
         FolderList.ScrollIntoView(folder);
         _folderRenameOriginalTitle = folder.Title;
@@ -1348,6 +1488,11 @@ public partial class MainWindow : Window
         if (result != MessageBoxResult.Yes)
         {
             return;
+        }
+
+        if (ReferenceEquals(_folderColorTarget, folder))
+        {
+            FolderColorPopup.IsOpen = false;
         }
 
         CommitActiveTab();
@@ -1465,6 +1610,52 @@ public partial class MainWindow : Window
 
         _state.FolderPanelWidth = width;
         ScheduleAutosave();
+    }
+
+    private void FolderPanel_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        UpdateFolderPanelCompactState(e.NewSize.Width);
+
+    private void UpdateFolderPanelCompactState(double width)
+    {
+        var compact = width <= FolderPanelCompactThreshold;
+        FolderList.Tag = compact;
+        FolderPanelTitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        FolderPanelFooter.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        FolderPanelFooterRow.Height = compact ? new GridLength(0) : new GridLength(24);
+
+        Grid.SetColumn(AddFolderButton, compact ? 0 : 1);
+        Grid.SetColumnSpan(AddFolderButton, compact ? 2 : 1);
+        AddFolderButton.BorderThickness = compact
+            ? new Thickness(0, 0, 0, 1)
+            : new Thickness(1, 0, 0, 1);
+
+        if (!compact && width > FolderPanelCompactThreshold)
+        {
+            _lastExpandedFolderPanelWidth = width;
+        }
+    }
+
+    private void ExpandFolderPanelForEditing(bool scheduleAutosave)
+    {
+        var currentWidth = FolderPanelColumn.ActualWidth > 0
+            ? FolderPanelColumn.ActualWidth
+            : FolderPanelColumn.Width.Value;
+        if (currentWidth >= FolderPanelEditingWidth)
+        {
+            return;
+        }
+
+        var width = Math.Clamp(
+            Math.Max(_lastExpandedFolderPanelWidth, FolderPanelEditingWidth),
+            WorkspaceState.MinFolderPanelWidth,
+            WorkspaceState.MaxFolderPanelWidth);
+        FolderPanelColumn.Width = new GridLength(width);
+        _state.FolderPanelWidth = width;
+        UpdateFolderPanelCompactState(width);
+        if (scheduleAutosave)
+        {
+            ScheduleAutosave();
+        }
     }
 
     private void TabsList_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -34,9 +34,11 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
             }
         };
         state.ScratchPalette[10] = "#123456";
+        state.FolderPalette[10] = "#654321";
         var commands = new WorkspaceFolder
         {
             Title = "Commands",
+            FolderColor = "#a855f7",
             SelectedTabIndex = 0
         };
         commands.Tabs.Add(new TabDocument
@@ -53,6 +55,7 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         var privateNotes = new WorkspaceFolder
         {
             Title = "Private",
+            FolderColor = "#654321",
             SelectedTabIndex = 1
         };
         privateNotes.Tabs.Add(new TabDocument
@@ -91,6 +94,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal(244, restored.FolderPanelWidth);
         Assert.Equal("Commands", restored.Folders[0].Title);
         Assert.Equal("Private", restored.Folders[1].Title);
+        Assert.Equal("#A855F7", restored.Folders[0].FolderColor);
+        Assert.Equal("#654321", restored.Folders[1].FolderColor);
         Assert.Equal(commands.Id, restored.Folders[0].Id);
         Assert.Equal(privateNotes.Id, restored.Folders[1].Id);
         Assert.Equal(0, restored.Folders[0].SelectedTabIndex);
@@ -110,6 +115,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal("classified-drawing-needle-4b2a", restored.Folders[1].Tabs[0].ScratchData);
         Assert.Equal("#123456", restored.ScratchPalette[10]);
         Assert.Equal(ScratchPaletteService.SlotCount, restored.ScratchPalette.Count);
+        Assert.Equal("#654321", restored.FolderPalette[10]);
+        Assert.Equal(ScratchPaletteService.SlotCount, restored.FolderPalette.Count);
         Assert.Equal(900, restored.Window.Width);
         Assert.True(restored.Window.WasMaximized);
     }
@@ -156,6 +163,20 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal(ThemeService.DefaultAppThemeId, state.AppThemeId);
         Assert.Equal(ThemeService.DefaultCodeThemeId, state.CodeThemeId);
         Assert.True(state.AutoWrap);
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_RoundTripsCompactFolderPanelWidth()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
+        var state = WorkspaceState.CreateDefault();
+        state.FolderPanelWidth = WorkspaceState.MinFolderPanelWidth;
+
+        await service.SaveAsync(state);
+        var restored = await service.LoadAsync();
+
+        Assert.Equal(WorkspaceState.MinFolderPanelWidth, restored.FolderPanelWidth);
     }
 
     [Fact]
@@ -244,6 +265,8 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal("drawing", state.Folders[0].Tabs[1].ScratchData);
         Assert.True(state.Folders[0].Tabs[1].IsScratchMode);
         Assert.Equal(WorkspaceState.DefaultFolderPanelWidth, state.FolderPanelWidth);
+        Assert.Equal(WorkspaceFolder.DefaultFolderColor, state.Folders[0].FolderColor);
+        Assert.Equal(ScratchPaletteService.SlotCount, state.FolderPalette.Count);
 
         await service.SaveAsync(state);
         using var saved = JsonDocument.Parse(await File.ReadAllTextAsync(paths.WorkspaceFile));
@@ -254,6 +277,47 @@ public sealed class WorkspacePersistenceServiceTests : IDisposable
         Assert.Equal(2, folders[0].GetProperty("tabs").GetArrayLength());
         Assert.False(root.TryGetProperty("tabs", out _));
         Assert.False(root.TryGetProperty("selectedTabIndex", out _));
+    }
+
+    [Fact]
+    public async Task Load_SchemaFiveWorkspace_DefaultsFolderColorsAndPalette()
+    {
+        var paths = new WorkspacePaths(_temporaryDirectory);
+        Directory.CreateDirectory(paths.DataDirectory);
+        await File.WriteAllTextAsync(paths.WorkspaceFile, """
+            {
+              "schemaVersion": 5,
+              "selectedFolderIndex": 0,
+              "folderPanelWidth": 180,
+              "folders": [
+                {
+                  "id": "b5311375-f5cc-4d09-95d0-501a5b644be8",
+                  "title": "Version Five",
+                  "selectedTabIndex": 0,
+                  "tabs": [
+                    {
+                      "id": "21b3cd86-b273-425d-b9f9-4b485448f2f0",
+                      "title": "KEPT",
+                      "content": "legacy folder content",
+                      "isProtected": false,
+                      "syntaxMode": "Plain Text",
+                      "showLineNumbers": true
+                    }
+                  ]
+                }
+              ]
+            }
+            """);
+        var service = new WorkspacePersistenceService(paths, new DpapiProtectionService());
+
+        var state = await service.LoadAsync();
+
+        Assert.Equal(WorkspaceState.CurrentSchemaVersion, state.SchemaVersion);
+        Assert.Single(state.Folders);
+        Assert.Equal("Version Five", state.Folders[0].Title);
+        Assert.Equal("legacy folder content", state.Folders[0].Tabs[0].Content);
+        Assert.Equal(WorkspaceFolder.DefaultFolderColor, state.Folders[0].FolderColor);
+        Assert.Equal(ScratchPaletteService.CreateDefaultPalette(), state.FolderPalette);
     }
 
     [Fact]

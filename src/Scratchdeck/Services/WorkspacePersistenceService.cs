@@ -119,6 +119,7 @@ public sealed class WorkspacePersistenceService
 
     private PersistedWorkspace ToPersisted(WorkspaceState state)
     {
+        var folderPalette = ScratchPaletteService.Normalize(state.FolderPalette);
         return new PersistedWorkspace
         {
             SchemaVersion = WorkspaceState.CurrentSchemaVersion,
@@ -142,11 +143,15 @@ public sealed class WorkspacePersistenceService
             AppThemeId = state.AppThemeId,
             CodeThemeId = state.CodeThemeId,
             ScratchPalette = [.. state.ScratchPalette],
+            FolderPalette = folderPalette,
             LegacyTabs = null,
             Folders = state.Folders.Select(folder => new PersistedFolder
             {
                 Id = folder.Id,
                 Title = folder.Title,
+                FolderColor = ThemeService.IsValidColor(folder.FolderColor)
+                    ? folder.FolderColor.Trim().ToUpperInvariant()
+                    : folderPalette[0],
                 SelectedTabIndex = folder.SelectedTabIndex,
                 Tabs = folder.Tabs.Select(ToPersistedTab).ToList()
             }).ToList()
@@ -188,7 +193,8 @@ public sealed class WorkspacePersistenceService
             AutoWrap = persisted.AutoWrap,
             AppThemeId = persisted.AppThemeId ?? ThemeService.LegacyAppThemeId(persisted.Theme),
             CodeThemeId = persisted.CodeThemeId ?? ThemeService.LegacyCodeThemeId(persisted.Theme),
-            ScratchPalette = persisted.ScratchPalette ?? ScratchPaletteService.CreateDefaultPalette()
+            ScratchPalette = persisted.ScratchPalette ?? ScratchPaletteService.CreateDefaultPalette(),
+            FolderPalette = persisted.FolderPalette ?? ScratchPaletteService.CreateDefaultPalette()
         };
     }
 
@@ -199,6 +205,7 @@ public sealed class WorkspacePersistenceService
         {
             Id = folder.Id,
             Title = folder.Title ?? "Untitled Folder",
+            FolderColor = folder.FolderColor ?? WorkspaceFolder.DefaultFolderColor,
             SelectedTabIndex = folder.SelectedTabIndex,
             Tabs = new ObservableCollection<TabDocument>(tabs.Select(FromPersistedTab))
         };
@@ -302,6 +309,7 @@ public sealed class WorkspacePersistenceService
         public string? AppThemeId { get; set; }
         public string? CodeThemeId { get; set; }
         public List<string>? ScratchPalette { get; set; }
+        public List<string>? FolderPalette { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Theme { get; set; }
     }
@@ -310,6 +318,7 @@ public sealed class WorkspacePersistenceService
     {
         public Guid Id { get; set; }
         public string? Title { get; set; }
+        public string? FolderColor { get; set; }
         public List<PersistedTab>? Tabs { get; set; } = [];
         public int SelectedTabIndex { get; set; }
     }

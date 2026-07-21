@@ -24,10 +24,12 @@ public sealed class ScratchPaletteServiceTests
         var state = new WorkspaceState
         {
             ScratchPalette = ["bad"],
+            FolderPalette = ["#abcdef", "bad"],
             Folders = new()
             {
                 new WorkspaceFolder
                 {
+                    FolderColor = "not-a-color",
                     Tabs = new()
                     {
                         new TabDocument
@@ -43,6 +45,10 @@ public sealed class ScratchPaletteServiceTests
         state.Normalize();
 
         Assert.Equal(ScratchPaletteService.SlotCount, state.ScratchPalette.Count);
+        Assert.Equal(ScratchPaletteService.SlotCount, state.FolderPalette.Count);
+        Assert.Equal("#ABCDEF", state.FolderPalette[0]);
+        Assert.Equal("#FFC247", state.FolderPalette[1]);
+        Assert.Equal(state.FolderPalette[0], state.Folders[0].FolderColor);
         Assert.Equal(state.ScratchPalette[0], state.Folders[0].Tabs[0].ScratchBrushColor);
         Assert.Equal(ScratchPaletteService.DefaultBrushSize, state.Folders[0].Tabs[0].ScratchBrushSize);
     }
@@ -97,5 +103,22 @@ public sealed class ScratchPaletteServiceTests
         Assert.Equal(
             state.Folders.Sum(folder => folder.Tabs.Count),
             state.Folders.SelectMany(folder => folder.Tabs).Select(tab => tab.Id).Distinct().Count());
+    }
+
+    [Theory]
+    [InlineData(12, WorkspaceState.MinFolderPanelWidth)]
+    [InlineData(WorkspaceState.MinFolderPanelWidth, WorkspaceState.MinFolderPanelWidth)]
+    [InlineData(72, 72)]
+    [InlineData(400, WorkspaceState.MaxFolderPanelWidth)]
+    public void WorkspaceNormalize_AllowsAndClampsCompactFolderPanelWidths(
+        double requested,
+        double expected)
+    {
+        var state = WorkspaceState.CreateDefault();
+        state.FolderPanelWidth = requested;
+
+        state.Normalize();
+
+        Assert.Equal(expected, state.FolderPanelWidth);
     }
 }
