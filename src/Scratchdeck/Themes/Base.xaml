@@ -199,6 +199,80 @@
         </Setter>
     </Style>
 
+    <Style x:Key="DeckTabAddButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="42" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Margin" Value="0,3,4,0" />
+        <Setter Property="Background" Value="{DynamicResource TabInactiveBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TabInactiveTextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource TabInactiveBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="Light" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="2,2,0,0"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource TabHoverBackgroundBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource TabHoverBorderBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TabHoverTextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource TabActiveBackgroundBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource TabActiveBorderBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TabActiveTextBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DeckTabCloseButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="23" />
+        <Setter Property="Height" Value="23" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TabCloseInactiveBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="2"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource TabHoverBackgroundBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TabCloseHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentMutedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="ToolToggleStyle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -400,6 +474,27 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
                     <ContentPresenter />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DeckTabContainerStyle" TargetType="ListBoxItem">
+        <Setter Property="Height" Value="39" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid Background="Transparent"
+                          SnapsToDevicePixels="True">
+                        <ContentPresenter Margin="0,3,4,0"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

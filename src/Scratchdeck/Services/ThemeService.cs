@@ -135,6 +135,20 @@ public sealed class ThemeService
             ["TextBrush"] = Solid(colors.Text),
             ["MutedTextBrush"] = Solid(colors.MutedText),
             ["SubtleTextBrush"] = Solid(colors.SubtleText),
+            ["TabStripBrush"] = Mix(colors.Background, colors.Surface, 0.45),
+            ["TabInactiveBackgroundBrush"] = Mix(colors.RaisedSurface, colors.PrimaryAccent, 0.04),
+            ["TabInactiveBorderBrush"] = Solid(colors.Border),
+            ["TabInactiveTextBrush"] = Solid(colors.MutedText),
+            ["TabHoverBackgroundBrush"] = Mix(colors.RaisedSurface, colors.PrimaryAccent, 0.12),
+            ["TabHoverBorderBrush"] = Mix(colors.Border, colors.PrimaryAccent, 0.45),
+            ["TabHoverTextBrush"] = Solid(colors.Text),
+            ["TabActiveBackgroundBrush"] = Mix(colors.RaisedSurface, colors.PrimaryAccent, 0.24),
+            ["TabActiveBorderBrush"] = Mix(colors.Border, colors.PrimaryAccent, 0.70),
+            ["TabActiveTextBrush"] = Solid(colors.Text),
+            ["TabActiveEdgeBrush"] = Solid(colors.PrimaryAccent),
+            ["TabActiveDetailBrush"] = Solid(colors.SecondaryAccent),
+            ["TabCloseInactiveBrush"] = Solid(colors.SubtleText),
+            ["TabCloseHoverBrush"] = Solid(colors.Text),
             ["DangerBrush"] = Solid(colors.Danger),
             ["SuccessBrush"] = Solid(colors.Success),
             ["FocusBrush"] = Solid(colors.PrimaryAccent)
@@ -613,6 +627,22 @@ public sealed class ThemeService
         brush.Freeze();
         return brush;
     }
+
+    private static SolidColorBrush Mix(string from, string to, double amount)
+    {
+        var start = ParseColor(from);
+        var end = ParseColor(to);
+        var brush = new SolidColorBrush(Color.FromArgb(
+            MixChannel(start.A, end.A, amount),
+            MixChannel(start.R, end.R, amount),
+            MixChannel(start.G, end.G, amount),
+            MixChannel(start.B, end.B, amount)));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static byte MixChannel(byte from, byte to, double amount) =>
+        (byte)Math.Round(from + ((to - from) * Math.Clamp(amount, 0, 1)));
 
     private static LinearGradientBrush Gradient(string top, string bottom)
     {

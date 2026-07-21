@@ -15,6 +15,20 @@
     <SolidColorBrush x:Key="TextBrush" Color="#ECEFF4" />
     <SolidColorBrush x:Key="MutedTextBrush" Color="#A5B0C0" />
     <SolidColorBrush x:Key="SubtleTextBrush" Color="#687589" />
+    <SolidColorBrush x:Key="TabStripBrush" Color="#222934" />
+    <SolidColorBrush x:Key="TabInactiveBackgroundBrush" Color="#323D4B" />
+    <SolidColorBrush x:Key="TabInactiveBorderBrush" Color="#465365" />
+    <SolidColorBrush x:Key="TabInactiveTextBrush" Color="#A5B0C0" />
+    <SolidColorBrush x:Key="TabHoverBackgroundBrush" Color="#394856" />
+    <SolidColorBrush x:Key="TabHoverBorderBrush" Color="#648495" />
+    <SolidColorBrush x:Key="TabHoverTextBrush" Color="#ECEFF4" />
+    <SolidColorBrush x:Key="TabActiveBackgroundBrush" Color="#445966" />
+    <SolidColorBrush x:Key="TabActiveBorderBrush" Color="#749FB0" />
+    <SolidColorBrush x:Key="TabActiveTextBrush" Color="#ECEFF4" />
+    <SolidColorBrush x:Key="TabActiveEdgeBrush" Color="#88C0D0" />
+    <SolidColorBrush x:Key="TabActiveDetailBrush" Color="#B48EAD" />
+    <SolidColorBrush x:Key="TabCloseInactiveBrush" Color="#687589" />
+    <SolidColorBrush x:Key="TabCloseHoverBrush" Color="#ECEFF4" />
     <SolidColorBrush x:Key="DangerBrush" Color="#BF616A" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#A3BE8C" />
     <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#1D232C" />
